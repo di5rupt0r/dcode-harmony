@@ -24,9 +24,39 @@ The finished project will be installable independently from the upstream `deepag
 - default model/provider selection to `local-harmony:gpt-oss-20b`;
 - `HarmonyCompletionChatModel` posting Harmony **tokens** to `/completion` with `return_tokens`;
 - SSE streaming via llama-server `stream: true` and `openai_harmony.StreamableParser`;
-- `apply_patch` registered through `dcode.extensions`.
+- `apply_patch` registered through `dcode.extensions`;
+- verified clean-environment install (`python -m pip install .`, `dcode --help`, `python -m build`).
 
-Not in this PR: live llama-server validation, lockfile/versioning policy.
+Not in this PR: live llama-server validation on this machine (server was not running; CI is not configured yet), lockfile/versioning policy.
+
+## Test validation
+
+```bash
+python -m pytest -q          # full suite (live tests skip without a server)
+python -m pytest -m "not live"  # 55 unit/integration tests, no server needed
+python -m pytest -m live     # requires llama-server on 127.0.0.1:8080
+```
+
+Live tests exercise `/health`, `/completion`, Harmony parsing, streaming, and
+the `apply_patch` tool-call shape. They were **not executed against a real
+server on this machine** — no llama-server was running and the host lacks
+~12 GB free RAM for the 20B Q4_K_M model.
+
+## apply_patch safety
+
+- Accepts only the GPT-OSS `*** Begin Patch` grammar (Add/Update/Delete,
+  optional `*** Move to:`, `@@` hunks, `*** End of File`). Unified diff is
+  **not** accepted — that would diverge from what GPT-OSS is trained to emit.
+- Tool schema: a single argument `patch: str`. Paths live inside the patch
+  text; a separate `path` argument (as in some shells) is not used.
+- Absolute paths, `../` traversal, and any symlink in the target path
+  (escaping or not) are rejected.
+- Every operation is validated and all new contents computed before any
+  write; a failure rolls earlier writes back (no partial multi-file state).
+- Writes use `dir_fd` + `O_NOFOLLOW`, so a symlink swapped in mid-operation
+  cannot redirect the write. Ambiguous hunk context is rejected
+  (`ambiguous context`).
+
 
 ## Current user experience
 
@@ -110,6 +140,25 @@ pytest -m "not live"
 - [`AGENTS.md`](AGENTS.md): mandatory document → test → implement → granular push workflow.
 
 Every agent must update both `HANDOFF.md` and `MILESTONES.md` before handing work to another agent.
+
+## Differences from upstream dcode
+
+- Ships a `local-harmony:gpt-oss-20b` provider class instead of requiring a
+  configured cloud provider on first run.
+- Injects a bootstrap `config.toml` when the profile has none (never
+  overwrites an existing file).
+- Registers an `apply_patch` tool through the public extension API.
+- Everything else (TUI, agent runtime, sessions, skills, subagents) is the
+  upstream `deepagents-code` runtime.
+
+## Limitations
+
+- Requires a locally running `llama-server` on `http://127.0.0.1:8080`
+  serving a GPT-OSS model; no provider is bundled.
+- Only the `*** Begin Patch` apply_patch grammar is supported.
+- Streaming tool calls are emitted as complete `tool_calls` chunks when the
+  call terminates; partial args are not streamed.
+- No CI configuration yet; the default `pytest -q` path is the local gate.
 
 ## License and provenance
 
