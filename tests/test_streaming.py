@@ -33,7 +33,7 @@ def _model(handler) -> HarmonyCompletionChatModel:
 def test_stream_sends_stream_true_and_yields_incremental_chunks() -> None:
     captured: dict[str, object] = {}
     tokens = _ENCODING.encode(
-        "<|start|>assistant<|channel|>final<|message|>hello world<|return|>",
+        "<|channel|>final<|message|>hello world<|return|>",
         allowed_special="all",
     )
     half = len(tokens) // 2
@@ -60,7 +60,7 @@ def test_stream_sends_stream_true_and_yields_incremental_chunks() -> None:
 
 def test_stream_hides_analysis_channel_from_output() -> None:
     tokens = _ENCODING.encode(
-        "<|start|>assistant<|channel|>analysis<|message|>secret reasoning"
+        "<|channel|>analysis<|message|>secret reasoning"
         "<|end|><|start|>assistant<|channel|>final<|message|>visible<|return|>",
         allowed_special="all",
     )
@@ -80,7 +80,7 @@ def test_stream_hides_analysis_channel_from_output() -> None:
 
 def test_stream_emits_tool_call_chunk() -> None:
     tokens = _ENCODING.encode(
-        '<|start|>assistant to=functions.apply_patch<|channel|>commentary json'
+        'to=functions.apply_patch<|channel|>commentary json'
         '<|message|>{"patch": "x"}<|call|>',
         allowed_special="all",
     )

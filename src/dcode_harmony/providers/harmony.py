@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, Huma
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from openai_harmony import (
+    StreamableParser,
     Author,
     Conversation,
     DeveloperContent,
@@ -200,16 +201,25 @@ class HarmonyCompletionChatModel(BaseChatModel):
         formatted = [convert_to_openai_tool(tool) for tool in tools]
         return self.bind(tools=formatted, **kwargs)
 
-    def _payload(self, messages: list[BaseMessage], tools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    def _payload(
+        self,
+        messages: list[BaseMessage],
+        tools: list[dict[str, Any]] | None = None,
+        *,
+        stream: bool = False,
+    ) -> dict[str, Any]:
         conversation = build_harmony_conversation(messages, tools=tools)
         prompt_tokens = _ENCODING.render_conversation_for_completion(conversation, Role.ASSISTANT)
-        return {
+        payload: dict[str, Any] = {
             "prompt": prompt_tokens,
             "n_predict": self.max_tokens,
             "temperature": self.temperature,
             "stop": self.stop,
             "return_tokens": True,
         }
+        if stream:
+            payload["stream"] = True
+        return payload
 
     def _post_completion(self, payload: dict[str, Any]) -> tuple[str, list[int] | None]:
         endpoint = f"{self.base_url.rstrip('/')}{self.completion_path}"
@@ -248,15 +258,97 @@ class HarmonyCompletionChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> Any:
         del run_manager
-        payload = self._payload(messages, tools=kwargs.get("tools"))
+        payload = self._payload(messages, tools=kwargs.get("tools"), stream=True)
         if stop:
             payload["stop"] = stop
-        content, tokens = self._post_completion(payload)
-        ai = parse_harmony_completion(content, tokens=tokens)
-        chunk = AIMessageChunk(
-            content=ai.content,
-            additional_kwargs=ai.additional_kwargs,
-            response_metadata=ai.response_metadata,
-            tool_calls=ai.tool_calls,
-        )
-        yield ChatGenerationChunk(message=chunk)
+        endpoint = f"{self.base_url.rstrip('/')}{self.completion_path}"
+        parser = StreamableParser(_ENCODING, Role.ASSISTANT)
+        emitted_tool_messages = 0
+        with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
+            with client.stream("POST", endpoint, json=payload) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:") :].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(f"Malformed streaming event: {data!r}") from exc
+                    if not isinstance(event, dict):
+                        raise ValueError("Malformed streaming event: expected object")
+                    chunk_tokens = event.get("tokens")
+                    if isinstance(chunk_tokens, list):
+                        final_deltas: list[str] = []
+                        for token in chunk_tokens:
+                            if isinstance(token, int):
+                                parser.process(token)
+                                delta = parser.last_content_delta
+                                if (
+                                    isinstance(delta, str)
+                                    and delta
+                                    and parser.current_channel == "final"
+                                ):
+                                    final_deltas.append(delta)
+                        if final_deltas:
+                            yield ChatGenerationChunk(
+                                message=AIMessageChunk(content="".join(final_deltas))
+                            )
+                    else:
+                        content = event.get("content")
+                        if isinstance(content, str) and content:
+                            yield ChatGenerationChunk(
+                                message=AIMessageChunk(content=content)
+                            )
+                    messages_so_far = parser.messages
+                    for msg in messages_so_far[emitted_tool_messages:]:
+                        recipient = msg.recipient if hasattr(msg, "recipient") else None
+                        channel = msg.channel
+                        if isinstance(recipient, str) and recipient.startswith("functions."):
+                            text = _content_text(msg.to_dict().get("content", ""))
+                            tool_name = recipient.split(".", 1)[1]
+                            try:
+                                tool_args = json.loads(text) if text else {}
+                            except json.JSONDecodeError:
+                                tool_args = None
+                            if isinstance(tool_args, dict):
+                                yield ChatGenerationChunk(
+                                    message=AIMessageChunk(
+                                        content="",
+                                        tool_calls=[
+                                            {
+                                                "name": tool_name,
+                                                "args": tool_args,
+                                                "id": f"call_{uuid.uuid4().hex}",
+                                                "type": "tool_call",
+                                            }
+                                        ],
+                                    )
+                                )
+                    emitted_tool_messages += 1
+        # Flush any trailing tool calls not yet emitted (missing <|call|> terminator).
+        for msg in parser.messages[emitted_tool_messages:]:
+            recipient = msg.recipient if hasattr(msg, "recipient") else None
+            if isinstance(recipient, str) and recipient.startswith("functions."):
+                text = _content_text(msg.to_dict().get("content", ""))
+                tool_name = recipient.split(".", 1)[1]
+                try:
+                    tool_args = json.loads(text) if text else {}
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(tool_args, dict):
+                    yield ChatGenerationChunk(
+                        message=AIMessageChunk(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": tool_name,
+                                    "args": tool_args,
+                                    "id": f"call_{uuid.uuid4().hex}",
+                                    "type": "tool_call",
+                                }
+                            ],
+                        )
+                    )
