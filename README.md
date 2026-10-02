@@ -2,7 +2,7 @@
 
 Standalone, plug-and-play distribution layer for running dcode with a local GPT-OSS model served by `llama-server` through the native Harmony/raw-completion protocol.
 
-> **Status: first working slice.** The repository now installs and exposes `dcode`, bootstraps a local Harmony default provider config, registers an `apply_patch` extension tool, and includes test coverage for launcher defaults, provider parsing/HTTP boundaries, and patch safety.
+> **Status: PR #1 (M1–M4).** Installable `dcode` launcher, native Harmony provider (token prompt, token parse, tool binding, tool history, SSE streaming), and a containment-safe `apply_patch` tool. Live server validation (M5) and release/lockfile policy (M6) are follow-up PRs.
 
 ## Goals
 
@@ -17,22 +17,20 @@ The finished project will be installable independently from the upstream `deepag
 - remain reproducible through pinned dependencies and a lockfile;
 - be developed strictly test-first.
 
-## Current scope
-
-Current implementation includes:
+## Current scope (this PR)
 
 - pinned package dependencies for `deepagents-code`, `deepagents`, and `openai-harmony`;
-- `dcode` launcher bootstrap that writes an isolated `~/.dcode-harmony/config.toml`;
+- `dcode` launcher bootstrap that writes an isolated `~/.dcode-harmony/config.toml` (overridable with `DEEPAGENTS_HOME`);
 - default model/provider selection to `local-harmony:gpt-oss-20b`;
-- a `BaseChatModel` provider that posts to `/completion`;
-- Harmony message conversion/parsing helpers using verified `openai-harmony` classes;
-- `apply_patch` as a Python extension tool registered through `dcode.extensions`.
+- `HarmonyCompletionChatModel` posting Harmony **tokens** to `/completion` with `return_tokens`;
+- SSE streaming via llama-server `stream: true` and `openai_harmony.StreamableParser`;
+- `apply_patch` registered through `dcode.extensions`.
 
-Remaining work is tracked in milestones for stronger native Harmony token rendering/parsing and broader live integration validation.
+Not in this PR: live llama-server validation, lockfile/versioning policy.
 
 ## Current user experience
 
-After the project is complete:
+After this PR's packaging/launcher work:
 
 ```bash
 git clone https://github.com/di5rupt0r/dcode-harmony.git
@@ -45,7 +43,7 @@ python -m pip install .
 dcode
 ```
 
-Advanced configuration may be supported later, but the default path already avoids manual provider setup for the first launch.
+Optional: `DEEPAGENTS_HOME=/path/to/profile dcode` uses that profile directory instead of `~/.dcode-harmony`. An existing `config.toml` in the profile is not overwritten.
 
 ## Dependency policy
 
@@ -87,8 +85,6 @@ The preferred integration order is:
 2. use supported dcode/deepagents agent-construction or configuration hooks;
 3. maintain the smallest compatibility shim required if the published package exposes no viable public hook.
 
-The fallback selected must be documented with the pinned versions and its upgrade cost.
-
 ## Test-first rule
 
 Tests precede implementation. This is a project rule, not a suggestion:
@@ -101,12 +97,19 @@ Tests precede implementation. This is a project rule, not a suggestion:
 
 Internal filesystem, formatting, parsing, and safety logic must use real tests. Mocking is allowed only at external dependency boundaries, such as HTTP transport to a separately running llama-server. No mock may replace the real patch application or Harmony parser behavior.
 
+Live tests are marked `@pytest.mark.live` and are not part of PR #1 acceptance. Run unit tests with:
+
+```bash
+pytest -m "not live"
+```
+
 ## Documentation and handoff
 
 - [`HANDOFF.md`](HANDOFF.md): operational state, decisions, validation, and continuation instructions.
 - [`MILESTONES.md`](MILESTONES.md): authoritative roadmap and acceptance criteria.
+- [`AGENTS.md`](AGENTS.md): mandatory document → test → implement → granular push workflow.
 
-Every agent must update both documents before handing work to another agent.
+Every agent must update both `HANDOFF.md` and `MILESTONES.md` before handing work to another agent.
 
 ## License and provenance
 
