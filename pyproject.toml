@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dcode-harmony"
+version = "0.1.0.dev0"
+description = "Plug-and-play local GPT-OSS Harmony integration for dcode"
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+license = { text = "MIT" }
+dependencies = [
+    # Exact versions are intentionally left for M1 after package metadata/API verification.
+    # Do not loosen these pins without updating HANDOFF.md and running compatibility tests.
+]
+
+[project.scripts]
+dcode = "dcode_harmony.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dcode_harmony"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers"]
