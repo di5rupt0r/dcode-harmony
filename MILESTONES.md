@@ -48,6 +48,13 @@ Acceptance criteria:
 - stop settings match the verified llama.cpp/Harmony behavior;
 - existing dcode TUI streaming expectations remain valid.
 
+Progress:
+- Streaming support implemented via `_stream` method yielding `ChatGenerationChunk`
+- Tool call parsing implemented and tested
+- Channel parsing implemented (analysis/commentary/final)
+- Message conversion implemented and tested
+- HTTP contract tested with mock transport
+
 Only HTTP transport may be mocked in unit tests. Protocol and message conversion tests must exercise real local code and the verified Harmony library.
 
 ## M3 — Mandatory `apply_patch` tool — IN PROGRESS
@@ -71,7 +78,12 @@ Acceptance criteria:
 - tool results are useful to the model;
 - registration is verified through the actual dcode integration path.
 
-## M4 — Plug-and-play launcher and model selection — TODO
+Progress:
+- All acceptance criteria implemented via extension API (preferred path)
+- All safety guardrails implemented and tested
+- Tool registered as `apply_patch` via `dcode.extensions` entry point
+
+## M4 — Plug-and-play launcher and model selection — IN PROGRESS
 
 Acceptance criteria:
 
@@ -81,7 +93,13 @@ Acceptance criteria:
 - existing upstream provider behavior is not modified unnecessarily;
 - launcher and model selection have real integration tests.
 
-## M5 — Live llama-server validation — TODO
+Progress:
+- Launcher bootstrap config auto-generates Harmony provider defaults
+- `DEEPAGENTS_HOME` environment override tested
+- Endpoint parameters (base_url, completion_path, timeout_s, stop) tested
+- Unit tests passing, integration tests pending
+
+## M5 — Live llama-server validation — IN PROGRESS
 
 Acceptance criteria:
 
@@ -91,6 +109,14 @@ Acceptance criteria:
 - validated reasoning/final output handling;
 - validated native tool call and `apply_patch` execution;
 - validated error handling when the service is down.
+
+Progress:
+- Live test suite added with `@pytest.mark.live` marker
+- Normal completion test added (with stop tokens)
+- Error handling test added (invalid requests)
+- End-to-end Harmony provider integration test added
+- Tests skip gracefully when server unavailable
+- Actual live run pending user's local server availability
 
 Tests that require a live server may be explicitly marked/skipped when unavailable, but must never be replaced by mocks.
 
@@ -109,3 +135,4 @@ Acceptance criteria:
 
 - 2026-10-02: Bootstrap recovery completed; created initial documented base after handoff attempts targeted an empty repository.
 - 2026-10-02: Added pinned dependency metadata, isolated launcher bootstrap, initial Harmony `/completion` provider slice, safe `apply_patch` extension tool, and test-first coverage for launcher/provider/patch safety.
+- 2026-10-02: Added streaming support to Harmony provider (`_stream` method), launcher environment override tests, and comprehensive live server validation test suite with skip-on-unavailable logic.
