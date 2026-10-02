@@ -148,10 +148,8 @@ def test_stream_yields_chunks_from_completion() -> None:
         captured["body"] = json.loads(request.content.decode())
         return httpx.Response(
             200,
-            json={
-                "content": "hello",
-                "tokens": None,
-            },
+            headers={"content-type": "text/event-stream"},
+            content=b'data: {"content": "hello", "stop": true}\n\ndata: [DONE]\n\n',
         )
 
     transport = httpx.MockTransport(_handler)
