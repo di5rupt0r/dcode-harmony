@@ -2,7 +2,7 @@
 
 Standalone, plug-and-play distribution layer for running dcode with a local GPT-OSS model served by `llama-server` through the native Harmony/raw-completion protocol.
 
-> **Status: bootstrap only.** This repository currently contains project documentation and packaging direction. The provider, launcher integration, and `apply_patch` implementation are not complete yet.
+> **Status: first working slice.** The repository now installs and exposes `dcode`, bootstraps a local Harmony default provider config, registers an `apply_patch` extension tool, and includes test coverage for launcher defaults, provider parsing/HTTP boundaries, and patch safety.
 
 ## Goals
 
@@ -19,17 +19,18 @@ The finished project will be installable independently from the upstream `deepag
 
 ## Current scope
 
-This initial commit establishes the standalone project contract and handoff documentation. It deliberately does **not** claim that the following are implemented:
+Current implementation includes:
 
-- Harmony prompt rendering or response parsing;
-- raw llama.cpp `/completion` requests;
-- automatic dcode launcher/provider integration;
-- `apply_patch` execution;
-- live llama-server validation.
+- pinned package dependencies for `deepagents-code`, `deepagents`, and `openai-harmony`;
+- `dcode` launcher bootstrap that writes an isolated `~/.dcode-harmony/config.toml`;
+- default model/provider selection to `local-harmony:gpt-oss-20b`;
+- a `BaseChatModel` provider that posts to `/completion`;
+- Harmony message conversion/parsing helpers using verified `openai-harmony` classes;
+- `apply_patch` as a Python extension tool registered through `dcode.extensions`.
 
-Those features are separate milestones and must begin with meaningful tests before implementation code.
+Remaining work is tracked in milestones for stronger native Harmony token rendering/parsing and broader live integration validation.
 
-## Planned user experience
+## Current user experience
 
 After the project is complete:
 
@@ -44,7 +45,7 @@ python -m pip install .
 dcode
 ```
 
-Advanced configuration may be supported later, but the default path must not require users to select a provider or edit dcode configuration.
+Advanced configuration may be supported later, but the default path already avoids manual provider setup for the first launch.
 
 ## Dependency policy
 
@@ -55,7 +56,13 @@ The project will depend on published packages rather than copying the complete u
 - `openai-harmony`: pinned to a verified compatible release;
 - only small direct dependencies needed by the integration layer.
 
-The exact versions must be verified against package metadata before they are committed. Monorepo-local `uv` path overrides must not be copied into this project.
+Pinned versions (verified from published wheel metadata):
+
+- `deepagents-code==0.1.80` (declares `deepagents==0.7.21`);
+- `deepagents==0.7.21`;
+- `openai-harmony==0.0.8`.
+
+Monorepo-local `uv` path overrides are not used.
 
 ## Architecture
 

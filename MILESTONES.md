@@ -11,7 +11,7 @@ Acceptance criteria:
 - HANDOFF records observed facts, inferences, decisions, validation, and continuation protocol.
 - Milestone plan is authoritative in-repository.
 
-## M1 — Standalone installable package — IN PROGRESS
+## M1 — Standalone installable package — DONE
 
 Write tests before implementation.
 
@@ -33,7 +33,7 @@ Suggested boundaries:
 3. launcher implementation;
 4. install/import/CLI validation.
 
-## M2 — Native Harmony provider — TODO
+## M2 — Native Harmony provider — IN PROGRESS
 
 Tests first, then implementation.
 
@@ -50,7 +50,7 @@ Acceptance criteria:
 
 Only HTTP transport may be mocked in unit tests. Protocol and message conversion tests must exercise real local code and the verified Harmony library.
 
-## M3 — Mandatory `apply_patch` tool — TODO
+## M3 — Mandatory `apply_patch` tool — IN PROGRESS
 
 This milestone cannot be deferred.
 
@@ -108,3 +108,4 @@ Acceptance criteria:
 ## Change log
 
 - 2026-10-02: Bootstrap recovery completed; created initial documented base after handoff attempts targeted an empty repository.
+- 2026-10-02: Added pinned dependency metadata, isolated launcher bootstrap, initial Harmony `/completion` provider slice, safe `apply_patch` extension tool, and test-first coverage for launcher/provider/patch safety.
