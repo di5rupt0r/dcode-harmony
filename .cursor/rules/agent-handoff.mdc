@@ -1,0 +1,17 @@
+---
+description: Multi-agent handoff — document, test, implement, then granular commit and push
+alwaysApply: true
+---
+
+# Agent workflow (mandatory)
+
+This repo is developed by multiple coding agents. Handoff must be frictionless.
+
+1. **Document first.** Update `HANDOFF.md` and `MILESTONES.md` with intent and acceptance criteria before code.
+2. **Tests second.** Write a failing test for every fix or feature. Run it and record the failure.
+3. **Implement third.** Smallest change that makes the test pass. Do not implement undocumented or untested work.
+4. **Commit and push granularly** to `origin` after each coherent unit (docs, tests, implementation, follow-up docs). Do not batch unrelated milestones into one commit.
+
+Do not start a later milestone on a PR whose scope is already fixed. Leave out-of-scope work as `TODO` in `MILESTONES.md` and a follow-up issue/PR.
+
+Match existing Python style: 4-space indent, double quotes, `from __future__ import annotations`.
