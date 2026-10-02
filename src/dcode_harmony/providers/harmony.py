@@ -177,6 +177,9 @@ class HarmonyCompletionChatModel(BaseChatModel):
     temperature: float = 0.0
     stop: list[str] = Field(default_factory=lambda: ["<|return|>", "<|call|>"])
     transport: httpx.BaseTransport | None = None
+    profile: dict[str, Any] | None = Field(
+        default_factory=lambda: {"tool_calling": True, "max_input_tokens": 32768}
+    )
 
     @property
     def _llm_type(self) -> str:

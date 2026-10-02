@@ -194,3 +194,10 @@ def test_bind_tools_includes_tool_in_prompt() -> None:
     assert isinstance(body["prompt"], list)
     # Verify tools are passed through (will be in the rendered conversation)
     assert body["prompt"]  # Just verify it's a token list
+
+
+def test_model_exposes_tool_calling_profile() -> None:
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b")
+    profile = getattr(model, "profile", None)
+    assert isinstance(profile, dict)
+    assert profile.get("tool_calling") is True
