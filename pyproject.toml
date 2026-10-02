@@ -10,12 +10,22 @@ readme = "README.md"
 requires-python = ">=3.12,<4.0"
 license = { text = "MIT" }
 dependencies = [
-    # Exact versions are intentionally left for M1 after package metadata/API verification.
-    # Do not loosen these pins without updating HANDOFF.md and running compatibility tests.
+    "deepagents-code==0.1.80",
+    "deepagents==0.7.21",
+    "openai-harmony==0.0.8",
+    "httpx>=0.28.1,<1",
 ]
 
 [project.scripts]
 dcode = "dcode_harmony.cli:main"
+
+[project.entry-points."dcode.extensions"]
+dcode_harmony = "dcode_harmony.extensions"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4,<9",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dcode_harmony"]
@@ -23,3 +33,6 @@ packages = ["src/dcode_harmony"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers"]
+markers = [
+    "live: requires external llama-server availability",
+]
