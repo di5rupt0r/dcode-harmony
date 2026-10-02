@@ -5,13 +5,20 @@ alwaysApply: true
 
 # Agent workflow (mandatory)
 
-This repo is developed by multiple coding agents. Handoff must be frictionless.
+This repo is developed by multiple coding agents. Handoff must be frictionless. Follow this order on every task; do not wait for the human to restate it.
 
-1. **Document first.** Update `HANDOFF.md` and `MILESTONES.md` with intent and acceptance criteria before code.
-2. **Tests second.** Write a failing test for every fix or feature. Run it and record the failure.
+1. **Document first.** Update `HANDOFF.md` and `MILESTONES.md` with intent, decisions, and acceptance criteria before code.
+2. **Tests second.** Write a failing test for every fix or feature. Run it and record the failure reason.
 3. **Implement third.** Smallest change that makes the test pass. Do not implement undocumented or untested work.
 4. **Commit and push granularly** to `origin` after each coherent unit (docs, tests, implementation, follow-up docs). Do not batch unrelated milestones into one commit.
 
-Do not start a later milestone on a PR whose scope is already fixed. Leave out-of-scope work as `TODO` in `MILESTONES.md` and a follow-up issue/PR.
+Also:
 
-Match existing Python style: 4-space indent, double quotes, `from __future__ import annotations`.
+- Read `AGENTS.md`, `HANDOFF.md`, `README.md`, and `MILESTONES.md` before changing code.
+- Run `pytest -m "not live"` after changes; report real counts.
+- Do not expand a scoped PR; leave out-of-scope work as `TODO` plus a follow-up issue/PR.
+- Match existing Python style: 4-space indent, double quotes, `from __future__ import annotations`.
+- Before using third-party APIs, inspect the installed package or upstream docs. Do not guess API names.
+- Mock only external boundaries (e.g. HTTP); do not mock internal behavior or real filesystem patching.
+
+Canonical detail lives in `AGENTS.md`. Keep this rule file aligned with it.
