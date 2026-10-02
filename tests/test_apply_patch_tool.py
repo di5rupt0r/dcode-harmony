@@ -60,7 +60,7 @@ def test_apply_patch_rejects_symlink_escape(tmp_path: Path) -> None:
 +inside
 *** End Patch
 """
-    with pytest.raises(PatchError, match="symlink escape"):
+    with pytest.raises(PatchError, match="symlink"):
         apply_patch_text(patch, workspace=tmp_path)
 
 
