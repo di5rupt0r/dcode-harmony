@@ -9,8 +9,18 @@ import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
-from openai_harmony import Conversation, DeveloperContent, Message, Role, ToolDescription
+from openai_harmony import (
+    Conversation,
+    DeveloperContent,
+    HarmonyEncodingName,
+    load_harmony_encoding,
+    Message,
+    Role,
+    ToolDescription,
+)
 from pydantic import Field
+
+_ENCODING = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
 
 
 def _tool_descriptions(tools: list[dict[str, Any]] | None) -> list[ToolDescription]:
@@ -79,6 +89,8 @@ def _content_text(raw: Any) -> str:
 
 def parse_harmony_completion(payload: str) -> AIMessage:
     """Parse Harmony-like message payload into LangChain AIMessage."""
+    if not payload:
+        return AIMessage(content="")
     data = json.loads(payload)
     if isinstance(data, dict):
         data = [data]
@@ -150,14 +162,15 @@ class HarmonyCompletionChatModel(BaseChatModel):
             "completion_path": self.completion_path,
         }
 
-    def _payload(self, messages: list[BaseMessage]) -> dict[str, Any]:
-        conversation = build_harmony_conversation(messages)
+    def _payload(self, messages: list[BaseMessage], tools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        conversation = build_harmony_conversation(messages, tools=tools)
+        prompt_tokens = _ENCODING.render_conversation_for_completion(conversation, Role.ASSISTANT)
         return {
-            "prompt": conversation.to_json(),
+            "prompt": prompt_tokens,
             "n_predict": self.max_tokens,
             "temperature": self.temperature,
             "stop": self.stop,
-            "timeout": self.timeout_s,
+            "return_tokens": True,
         }
 
     def _post_completion(self, payload: dict[str, Any]) -> str:
@@ -178,8 +191,8 @@ class HarmonyCompletionChatModel(BaseChatModel):
         run_manager: Any | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        del run_manager, kwargs
-        payload = self._payload(messages)
+        del run_manager
+        payload = self._payload(messages, tools=kwargs.get("tools"))
         if stop:
             payload["stop"] = stop
         ai = parse_harmony_completion(self._post_completion(payload))
