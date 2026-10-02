@@ -201,3 +201,28 @@ def test_model_exposes_tool_calling_profile() -> None:
     profile = getattr(model, "profile", None)
     assert isinstance(profile, dict)
     assert profile.get("tool_calling") is True
+
+
+def test_bind_tools_real_path_renders_apply_patch_schema() -> None:
+    from openai_harmony import HarmonyEncodingName, load_harmony_encoding
+
+    captured: dict[str, object] = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(200, json={"content": "ok", "tokens": None})
+
+    def apply_patch(patch: str) -> str:
+        """Apply a patch inside the workspace."""
+        return patch
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b",
+        base_url="http://127.0.0.1:8080",
+        transport=httpx.MockTransport(_handler),
+    )
+    model.bind_tools([apply_patch]).invoke([HumanMessage("hi")])
+    enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
+    rendered = enc.decode(captured["body"]["prompt"])
+    assert "apply_patch" in rendered
+    assert "patch: string" in rendered
