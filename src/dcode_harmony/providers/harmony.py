@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 import uuid
+<<<<<<< HEAD
 from typing import Any, Sequence
+=======
+from typing import Any
+>>>>>>> 87ebc2dc251ea2c137de5c3020ba8979a98f9e19
 
 import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
