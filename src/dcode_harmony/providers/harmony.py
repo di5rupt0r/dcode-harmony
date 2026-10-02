@@ -8,10 +8,11 @@ from typing import Any, Sequence
 
 import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from openai_harmony import (
+    Author,
     Conversation,
     DeveloperContent,
     HarmonyEncodingName,
@@ -65,8 +66,23 @@ def build_harmony_conversation(
                 Message.from_role_and_content(Role.USER, str(message.content))
             )
         elif isinstance(message, AIMessage):
+            content = str(message.content or "")
+            if content.strip():
+                harmony_messages.append(
+                    Message.from_role_and_content(Role.ASSISTANT, content).with_channel("final")
+                )
+            for tool_call in getattr(message, "tool_calls", []) or []:
+                name = tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
+                args = tool_call.get("args", {}) if isinstance(tool_call, dict) else tool_call.args
+                harmony_messages.append(
+                    Message.from_role_and_content(Role.ASSISTANT, json.dumps(args))
+                    .with_channel("commentary")
+                    .with_recipient(f"functions.{name}")
+                )
+        elif isinstance(message, ToolMessage):
+            name = message.name or "tool"
             harmony_messages.append(
-                Message.from_role_and_content(Role.ASSISTANT, str(message.content))
+                Message.from_author_and_content(Author.new(Role.TOOL, name), str(message.content))
             )
         else:
             harmony_messages.append(
