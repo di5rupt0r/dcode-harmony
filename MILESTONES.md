@@ -13,7 +13,7 @@ Acceptance criteria:
 - HANDOFF records observed facts, inferences, decisions, validation, and continuation protocol.
 - Milestone plan is authoritative in-repository.
 
-## M1 — Standalone installable package — IN PROGRESS
+## M1 — Standalone installable package — DONE
 
 Write tests before implementation.
 
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 This PR finishes M1 as part of the packaging/launcher bootstrap.
 
-## M2 — Native Harmony provider — IN PROGRESS
+## M2 — Native Harmony provider — DONE
 
 Tests first, then implementation.
 
@@ -51,7 +51,7 @@ Acceptance criteria (this PR):
 
 Only HTTP transport may be mocked in unit tests. Protocol and message conversion tests must exercise the installed `openai-harmony` encoding.
 
-## M3 — Mandatory `apply_patch` tool — IN PROGRESS
+## M3 — Mandatory `apply_patch` tool — DONE
 
 This milestone cannot be deferred.
 
@@ -69,7 +69,7 @@ Acceptance criteria (this PR):
 - trailing newline and CRLF are preserved;
 - registration is verified through a fake `ExtensionAPI` (`api.cwd` wrapped in `Path`).
 
-## M4 — Plug-and-play launcher and model selection — IN PROGRESS
+## M4 — Plug-and-play launcher and model selection — DONE
 
 Acceptance criteria (this PR, unit-level):
 
@@ -109,3 +109,28 @@ Acceptance criteria:
 
 - 2026-10-02: Bootstrap recovery completed; created initial documented base after handoff attempts targeted an empty repository.
 - 2026-10-02: PR #1 scope locked to M1–M4. M5 and M6 deferred to follow-up PRs.
+
+## 2026-10-02 review-round status update
+
+- M1 DONE: clean-environment `uv`/`pip install .` verified; `dcode --help`,
+  `import dcode_harmony/deepagents_code/openai_harmony`, `pytest -q`
+  (55 passed / 8 live-skipped), and `python -m build` all ran green.
+- M2 DONE: prompt is a token array (never `Conversation.to_json()`); tool
+  declarations render via `DeveloperContent.with_function_tools`; `bind_tools`
+  threads through the real LangChain path; `AIMessage.tool_calls`/`
+  ToolMessage` round-trip; parsing matrix covers analysis/commentary/final,
+  truncated, malformed, unknown-recipient, fragmented JSON; real SSE
+  streaming via `StreamableParser`; `profile={"tool_calling": True}` set.
+- M3 DONE: GPT-OSS `*** Begin Patch` grammar (Add/Update/Delete/Move to/
+  `*** End of File`); ambiguous context rejected; CRLF/trailing-newline
+  preserved; validate-before-write + rollback; `dir_fd`+`O_NOFOLLOW`
+  writes; symlink and traversal rejected. Integration test through the real
+  extension registry passes.
+- M4 DONE: bootstrap config.toml is consumed by the real
+  `deepagents_code.config.create_model` (subprocess test); no overwrite of
+  existing config; `cli_main() -> None` maps to exit 0; `dcode --help`
+  subprocess smoke test passes.
+- M5 TODO (unchanged): no llama-server running on this host; all live tests
+  skip. Live tests expanded to cover `/health`, `/completion`, provider
+  invoke, streaming, and tool-call shape for when a server is available.
+- M6 TODO (unchanged): no CI config, no lockfile policy yet.
