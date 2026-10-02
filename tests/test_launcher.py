@@ -98,3 +98,15 @@ def test_generated_config_is_consumed_by_real_dcode(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "dcode_harmony.providers.harmony:HarmonyCompletionChatModel" in result.stdout
     assert "http://127.0.0.1:8080 /completion" in result.stdout
+
+
+def test_dcode_help_subprocess(tmp_path: Path) -> None:
+    import subprocess, sys
+
+    env = {**__import__("os").environ, "DEEPAGENTS_HOME": str(tmp_path / "profile")}
+    binary = Path(sys.executable).parent / "dcode"
+    result = subprocess.run(
+        [str(binary), "--help"], env=env, capture_output=True, text=True, timeout=180
+    )
+    assert result.returncode == 0
+    assert "deepagents-code" in result.stdout
