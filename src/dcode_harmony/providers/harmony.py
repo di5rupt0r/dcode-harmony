@@ -106,16 +106,16 @@ def _content_text(raw: Any) -> str:
 
 def parse_harmony_completion(payload: str, tokens: list[int] | None = None) -> AIMessage:
     """Parse Harmony completion response into LangChain AIMessage."""
-    if not payload:
-        return AIMessage(content="")
-
-    # If tokens are provided and non-empty, parse using Harmony encoding
+    # Tokens from `return_tokens` are authoritative; they parse even when the
+    # text payload is empty (the server may send tokens only).
     if tokens:
         try:
             messages = _ENCODING.parse_messages_from_completion_tokens(tokens, Role.ASSISTANT)
         except Exception as exc:
             raise ValueError(f"Failed to parse completion tokens: {exc}") from exc
     else:
+        if not payload:
+            return AIMessage(content="")
         # Fallback: try JSON parsing, otherwise treat as plain text
         try:
             data = json.loads(payload)

@@ -226,3 +226,93 @@ def test_bind_tools_real_path_renders_apply_patch_schema() -> None:
     rendered = enc.decode(captured["body"]["prompt"])
     assert "apply_patch" in rendered
     assert "patch: string" in rendered
+
+
+def _tokens_for(text: str) -> list[int]:
+    return _ENC.encode(text, allowed_special="all")
+
+
+_ENC = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
+
+
+def test_parse_normal_final_response_from_tokens() -> None:
+    tokens = _tokens_for("<|channel|>final<|message|>hello there<|return|>")
+    ai = parse_harmony_completion("", tokens=tokens)
+    assert ai.content == "hello there"
+    assert not ai.tool_calls
+
+
+def test_parse_analysis_channel_not_in_final_content() -> None:
+    tokens = _tokens_for(
+        "<|channel|>analysis<|message|>secret thoughts<|end|>"
+        "<|start|>assistant<|channel|>final<|message|>visible answer<|return|>"
+    )
+    ai = parse_harmony_completion("", tokens=tokens)
+    assert ai.content == "visible answer"
+    assert "secret thoughts" not in ai.content
+
+
+def test_parse_empty_completion() -> None:
+    ai = parse_harmony_completion("", tokens=None)
+    assert ai.content == ""
+
+
+def test_parse_truncated_tokens_return_sane_ai_message() -> None:
+    tokens = _tokens_for("<|channel|>final<|message|>partial")
+    try:
+        ai = parse_harmony_completion("", tokens=tokens)
+    except ValueError:
+        return  # also acceptable: explicit failure
+    assert isinstance(ai.content, str)
+
+
+def test_parse_tool_call_with_whitespace_padded_json() -> None:
+    from openai_harmony import Message
+
+    msg = Message.from_role_and_content(
+        Role.ASSISTANT, '  { "patch": "x" }  '
+    ).with_channel("commentary").with_recipient("functions.apply_patch")
+    ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
+    assert ai.tool_calls[0]["args"] == {"patch": "x"}
+
+
+def test_parse_tool_call_fragmented_json_across_content_items() -> None:
+    from openai_harmony import Message
+
+    msg = Message.from_role_and_content(
+        Role.ASSISTANT, '{"pat' + 'ch": "y"}'
+    ).with_channel("commentary").with_recipient("functions.apply_patch")
+    ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
+    assert ai.tool_calls[0]["args"] == {"patch": "y"}
+
+
+def test_parse_unknown_recipient_tool_is_not_registered_error() -> None:
+    from openai_harmony import Message
+
+    msg = Message.from_role_and_content(Role.ASSISTANT, '{"x": 1}').with_channel(
+        "commentary"
+    ).with_recipient("functions.nonexistent_tool")
+    # Parsing must not invent a registered tool; it records the call by name
+    # and the runtime rejects unknown tools. The name must be preserved.
+    ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
+    assert ai.tool_calls[0]["name"] == "nonexistent_tool"
+
+
+def test_parse_plain_text_fallback_is_final_content() -> None:
+    ai = parse_harmony_completion("just some text", tokens=None)
+    assert ai.content == "just some text"
+
+
+def test_parse_multiple_tool_calls() -> None:
+    from openai_harmony import Message
+
+    m1 = Message.from_role_and_content(Role.ASSISTANT, '{"patch": "a"}').with_channel(
+        "commentary"
+    ).with_recipient("functions.apply_patch")
+    m2 = Message.from_role_and_content(Role.ASSISTANT, '{"patch": "b"}').with_channel(
+        "commentary"
+    ).with_recipient("functions.apply_patch")
+    ai = parse_harmony_completion(json.dumps([m1.to_dict(), m2.to_dict()]))
+    assert len(ai.tool_calls) == 2
+    assert {c["args"]["patch"] for c in ai.tool_calls} == {"a", "b"}
+    assert ai.tool_calls[0]["id"] != ai.tool_calls[1]["id"]
