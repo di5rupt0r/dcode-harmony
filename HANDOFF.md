@@ -41,3 +41,31 @@ After changing code: run `pytest -m "not live"`; update milestone status with re
 ### 2026-10-02 — PR #1 (M1–M4)
 
 This session closes PR #1 as a finished M1–M4 unit. Implementation follows this handoff: native Harmony render/parse/bind/history/SSE streaming, dir_fd `apply_patch`, launcher `None`→0 and home override tests. M5/M6 remain TODO.
+
+### 2026-10-02 — PR review fix round (operator prompt)
+
+- `src/dcode_harmony/providers/harmony.py` contained unresolved merge-conflict
+  markers (SyntaxError) breaking every import; repaired (commit ed71ae2);
+  suite now collects and passes 16/4-skipped.
+- `.venv` rebuilt with uv-managed CPython 3.14.7 (system python3.14 lacked
+  `Python.h`; `bsdiff4` could not build). Installed pins:
+  `deepagents-code==0.1.80`, `deepagents==0.7.21`, `openai-harmony==0.0.8`,
+  `httpx==0.28.1`, pytest 8.4.2. No dnf installs needed.
+- `git push` restored after transient network failure; local agent-policy
+  commit was redundant with remote e3c15e0 and was dropped.
+
+Defects found during inspection (fix order per PR review):
+
+1. `build_harmony_conversation` drops `AIMessage.tool_calls` and maps
+   `ToolMessage` to `Role.USER` instead of a tool response → broken tool loop.
+2. `_stream` does not stream; it replays one non-streaming response as a
+   single chunk. llama-server SSE (`stream: true`) + `StreamableParser` needed.
+3. Model exposes no `profile` capability dict for dcode's negotiation.
+4. `apply_patch`: no `*** Move to:`, CRLF/trailing-newline not preserved,
+   ambiguous context not detected, no validate-before-write/rollback, no
+   `O_NOFOLLOW`/`dir_fd` hardening.
+5. Tool contract decided: `apply_patch(patch: str)` (paths live inside the
+   patch text per GPT-OSS grammar); document instead of splitting path+patch.
+
+Protocol for this round: failing test first (recorded), smallest fix, rerun,
+commit+push each coherent unit, update HANDOFF/MILESTONES/README.
