@@ -48,4 +48,7 @@ def run_dcode() -> int:
     os.environ.setdefault("DEEPAGENTS_CODE_EXPERIMENTAL", "1")
     from deepagents_code import cli_main
 
-    return int(cli_main())
+    result = cli_main()
+    # deepagents_code.cli_main is typed `() -> None` (exits via SystemExit);
+    # a return of None means success.
+    return 0 if result is None else int(result)

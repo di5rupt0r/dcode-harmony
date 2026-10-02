@@ -59,3 +59,22 @@ def test_bootstrap_config_includes_endpoint_params() -> None:
     assert "completion_path = \"/completion\"" in config
     assert "timeout_s = 120.0" in config
     assert 'stop = ["<|return|>", "<|call|>"]' in config
+
+
+def test_cli_main_none_maps_to_exit_zero(monkeypatch, tmp_path: Path) -> None:
+    def _cli_main() -> None:
+        return None
+
+    monkeypatch.setitem(sys.modules, "deepagents_code", types.SimpleNamespace(cli_main=_cli_main))
+    monkeypatch.setenv("DEEPAGENTS_HOME", str(tmp_path / "profile"))
+
+    assert cli.main() == 0
+
+
+def test_run_dcode_does_not_overwrite_existing_config(monkeypatch, tmp_path: Path) -> None:
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "config.toml").write_text("# user edits\n", encoding="utf-8")
+    monkeypatch.setenv("DEEPAGENTS_HOME", str(profile))
+    ensure_profile(profile)
+    assert (profile / "config.toml").read_text(encoding="utf-8") == "# user edits\n"
