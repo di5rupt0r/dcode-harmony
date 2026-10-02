@@ -316,3 +316,70 @@ def test_parse_multiple_tool_calls() -> None:
     assert len(ai.tool_calls) == 2
     assert {c["args"]["patch"] for c in ai.tool_calls} == {"a", "b"}
     assert ai.tool_calls[0]["id"] != ai.tool_calls[1]["id"]
+
+
+def test_payload_includes_n_predict_and_temperature() -> None:
+    captured: dict[str, object] = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(200, json={"content": "ok", "tokens": None})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b",
+        base_url="http://127.0.0.1:8080",
+        max_tokens=123,
+        temperature=0.5,
+        transport=httpx.MockTransport(_handler),
+    )
+    model.invoke([HumanMessage("hi")])
+    body = captured["body"]
+    assert body["n_predict"] == 123
+    assert body["temperature"] == 0.5
+
+
+def test_http_error_status_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_missing_content_field_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"tokens": None})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(ValueError, match="content"):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_invalid_json_response_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not json")
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(Exception):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_post_method_is_used() -> None:
+    captured: dict[str, object] = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        return httpx.Response(200, json={"content": "ok", "tokens": None})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    model.invoke([HumanMessage("hi")])
+    assert captured["method"] == "POST"
