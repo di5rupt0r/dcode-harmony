@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any
 
 import httpx
@@ -87,46 +88,57 @@ def _content_text(raw: Any) -> str:
     return ""
 
 
-def parse_harmony_completion(payload: str) -> AIMessage:
-    """Parse Harmony-like message payload into LangChain AIMessage."""
+def parse_harmony_completion(payload: str, tokens: list[int] | None = None) -> AIMessage:
+    """Parse Harmony completion response into LangChain AIMessage."""
     if not payload:
         return AIMessage(content="")
-    data = json.loads(payload)
-    if isinstance(data, dict):
-        data = [data]
-    if not isinstance(data, list):
-        raise ValueError("Malformed Harmony response: expected JSON list/dict")
+
+    # If tokens are provided and non-empty, parse using Harmony encoding
+    if tokens:
+        try:
+            messages = _ENCODING.parse_messages_from_completion_tokens(tokens, Role.ASSISTANT)
+        except Exception as exc:
+            raise ValueError(f"Failed to parse completion tokens: {exc}") from exc
+    else:
+        # Fallback: try JSON parsing, otherwise treat as plain text
+        try:
+            data = json.loads(payload)
+            if isinstance(data, dict):
+                data = [data]
+            if not isinstance(data, list):
+                raise ValueError("Malformed Harmony response: expected JSON list/dict")
+            messages = [Message.from_dict(entry) for entry in data if isinstance(entry, dict)]
+        except json.JSONDecodeError:
+            # Not JSON, treat as plain text final message
+            return AIMessage(content=payload, tool_calls=[])
 
     final_chunks: list[str] = []
     commentary_chunks: list[str] = []
     tool_calls: list[dict[str, Any]] = []
 
-    for entry in data:
-        if not isinstance(entry, dict):
-            continue
-        message = Message.from_dict(entry)
-        text = _content_text(entry.get("content", ""))
-        channel = message.channel or "final"
-        recipient = message.recipient
+    for msg in messages:
+        text = _content_text(msg.to_dict().get("content", ""))
+        channel = msg.channel or "final"
+        recipient = msg.recipient
+
         if isinstance(recipient, str) and recipient.startswith("functions."):
             tool_name = recipient.split(".", 1)[1]
             try:
                 tool_args = json.loads(text) if text else {}
-            except json.JSONDecodeError as exc:  # noqa: PERF203
-                raise ValueError(
-                    f"Malformed tool-call arguments for {tool_name}"
-                ) from exc
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Malformed tool-call arguments for {tool_name}") from exc
             if not isinstance(tool_args, dict):
                 raise ValueError(f"Malformed tool-call arguments for {tool_name}")
             tool_calls.append(
                 {
                     "name": tool_name,
                     "args": tool_args,
-                    "id": f"call_{len(tool_calls)}",
+                    "id": f"call_{uuid.uuid4().hex}",
                     "type": "tool_call",
                 }
             )
             continue
+
         if channel == "analysis":
             continue
         if channel == "commentary":
@@ -173,16 +185,19 @@ class HarmonyCompletionChatModel(BaseChatModel):
             "return_tokens": True,
         }
 
-    def _post_completion(self, payload: dict[str, Any]) -> str:
+    def _post_completion(self, payload: dict[str, Any]) -> tuple[str, list[int] | None]:
         endpoint = f"{self.base_url.rstrip('/')}{self.completion_path}"
         with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
             response = client.post(endpoint, json=payload)
         response.raise_for_status()
         body = response.json()
         content = body.get("content")
+        tokens = body.get("tokens")
         if not isinstance(content, str):
             raise ValueError("Malformed completion response: missing string content")
-        return content
+        if tokens is not None and not isinstance(tokens, list):
+            raise ValueError("Malformed completion response: tokens must be a list")
+        return content, tokens
 
     def _generate(
         self,
@@ -195,7 +210,8 @@ class HarmonyCompletionChatModel(BaseChatModel):
         payload = self._payload(messages, tools=kwargs.get("tools"))
         if stop:
             payload["stop"] = stop
-        ai = parse_harmony_completion(self._post_completion(payload))
+        content, tokens = self._post_completion(payload)
+        ai = parse_harmony_completion(content, tokens=tokens)
         return ChatResult(generations=[ChatGeneration(message=ai)])
 
     def _stream(
@@ -205,12 +221,12 @@ class HarmonyCompletionChatModel(BaseChatModel):
         run_manager: Any | None = None,
         **kwargs: Any,
     ) -> Any:
-        del run_manager, kwargs
-        payload = self._payload(messages)
+        del run_manager
+        payload = self._payload(messages, tools=kwargs.get("tools"))
         if stop:
             payload["stop"] = stop
-        content = self._post_completion(payload)
-        ai = parse_harmony_completion(content)
+        content, tokens = self._post_completion(payload)
+        ai = parse_harmony_completion(content, tokens=tokens)
         chunk = AIMessageChunk(
             content=ai.content,
             additional_kwargs=ai.additional_kwargs,
