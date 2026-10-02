@@ -78,3 +78,23 @@ def test_run_dcode_does_not_overwrite_existing_config(monkeypatch, tmp_path: Pat
     monkeypatch.setenv("DEEPAGENTS_HOME", str(profile))
     ensure_profile(profile)
     assert (profile / "config.toml").read_text(encoding="utf-8") == "# user edits\n"
+
+
+def test_generated_config_is_consumed_by_real_dcode(tmp_path: Path) -> None:
+    """The bootstrap config.toml must actually load through deepagents_code."""
+    import subprocess, sys
+
+    profile = ensure_profile(tmp_path / "profile")
+    env = {**__import__("os").environ, "DEEPAGENTS_HOME": str(profile)}
+    code = (
+        "from deepagents_code.config import create_model;"
+        "r = create_model('local-harmony:gpt-oss-20b');"
+        "m = r.model; print(type(m).__module__ + ':' + type(m).__name__);"
+        "print(m.base_url, m.completion_path)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120
+    )
+    assert result.returncode == 0, result.stderr
+    assert "dcode_harmony.providers.harmony:HarmonyCompletionChatModel" in result.stdout
+    assert "http://127.0.0.1:8080 /completion" in result.stdout
