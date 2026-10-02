@@ -69,3 +69,42 @@ Defects found during inspection (fix order per PR review):
 
 Protocol for this round: failing test first (recorded), smallest fix, rerun,
 commit+push each coherent unit, update HANDOFF/MILESTONES/README.
+
+### 2026-10-02 — Review-fix round results (PR #1 not merge-ready → M1–M4 done)
+
+Commands actually executed (all on this host, 2026-10-02):
+
+- `uv venv` rebuild with uv-managed CPython 3.14.7; `uv pip install -e ".[dev]"`
+  → deepagents-code 0.1.80, deepagents 0.7.21, openai-harmony 0.0.8,
+  langchain-core 1.6.6, httpx 0.28.1, pytest 8.4.2.
+- `pytest -q` after repairing conflict markers: 16 passed, 4 skipped.
+- Per-fix failing-test-first commits: `282b65b` (tool history), `6d8e2a1`
+  (SSE streaming), parsing matrix `0c089fe`, apply_patch `4795718`,
+  extension registry `5b9f92b`, launcher exit-code `b52d44b`.
+- Latest full run: `55 passed, 8 skipped` (8 = live, server absent).
+- Clean env: `/tmp/opencode/cleanenv` venv, `uv pip install .`,
+  `dcode --help` → deepagents-code v0.1.80 banner, `import
+  dcode_harmony/deepagents_code/openai_harmony` OK.
+- `python -m build` → wheel + sdist built; dist/ and egg-info removed after.
+- Real llama-server: NOT running on this host (no llama service, ~6 GB free
+  RAM vs ~12 GB needed for Q4_K_M gguf). `pytest -m live` → `8 skipped`.
+  No live validation was performed; do not claim otherwise.
+- Mocks used only at HTTP transport (httpx.MockTransport) and one subprocess
+  boundary for extension/dcode config tests. Everything else real.
+
+Decisions recorded:
+
+- Tokens are authoritative for prompts and parsing; JSON fallback only when
+  tokens are absent (plain-text final messages).
+- `apply_patch` accepts only the GPT-OSS `*** Begin Patch` grammar; unified
+  diff explicitly rejected. Schema keeps single `patch: str` argument.
+- Streaming is real SSE (`stream: true`); analysis channel content is never
+  emitted as visible chunks; tool calls surface as complete chunks on close.
+- Multi-file patches validate before writing and roll back on failure.
+- No dnf packages installed; wei `uv`-managed interpreter was sufficient.
+
+Remaining risks: live validation pending; no CI (default local pytest is the
+gate); lockfile policy (M6) deferred; tool-call partial args not streamed.
+
+Recommendation: do not merge until an operator runs `pytest -m live` against
+a running llama-server (M5) and CI or an equivalent local gate is wired.
