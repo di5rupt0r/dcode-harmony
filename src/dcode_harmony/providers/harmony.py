@@ -7,8 +7,8 @@ from typing import Any
 
 import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from openai_harmony import Conversation, DeveloperContent, Message, Role, ToolDescription
 from pydantic import Field
 
@@ -184,3 +184,24 @@ class HarmonyCompletionChatModel(BaseChatModel):
             payload["stop"] = stop
         ai = parse_harmony_completion(self._post_completion(payload))
         return ChatResult(generations=[ChatGeneration(message=ai)])
+
+    def _stream(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: Any | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        del run_manager, kwargs
+        payload = self._payload(messages)
+        if stop:
+            payload["stop"] = stop
+        content = self._post_completion(payload)
+        ai = parse_harmony_completion(content)
+        chunk = AIMessageChunk(
+            content=ai.content,
+            additional_kwargs=ai.additional_kwargs,
+            response_metadata=ai.response_metadata,
+            tool_calls=ai.tool_calls,
+        )
+        yield ChatGenerationChunk(message=chunk)

@@ -96,3 +96,30 @@ def test_completion_http_contract() -> None:
     assert isinstance(body, dict)
     assert body["timeout"] == 9.0
     assert body["stop"] == ["<|return|>", "<|call|>"]
+
+
+def test_stream_yields_chunks_from_completion() -> None:
+    captured: dict[str, object] = {}
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content.decode())
+        return httpx.Response(
+            200,
+            json={
+                "content": '[{"role":"assistant","channel":"final","content":"hello"}]',
+            },
+        )
+
+    transport = httpx.MockTransport(_handler)
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b",
+        base_url="http://127.0.0.1:8080",
+        timeout_s=9.0,
+        transport=transport,
+    )
+
+    chunks = list(model.stream([HumanMessage("test")]))
+    assert len(chunks) >= 1
+    assert chunks[0].content == "hello"
+    assert captured["url"] == "http://127.0.0.1:8080/completion"
