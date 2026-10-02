@@ -43,3 +43,19 @@ def test_cli_main_sets_env_and_delegates(monkeypatch, tmp_path: Path) -> None:
     assert cli.main() == 7
     assert calls["DEEPAGENTS_HOME"].endswith(".dcode-harmony")
     assert calls["DEEPAGENTS_CODE_EXPERIMENTAL"] == "1"
+
+
+def test_launcher_respects_env_override_for_home(monkeypatch, tmp_path: Path) -> None:
+    custom_home = tmp_path / "custom"
+    monkeypatch.setenv("DEEPAGENTS_HOME", str(custom_home))
+    profile = ensure_profile(custom_home)
+    assert profile == custom_home
+    assert profile.exists()
+
+
+def test_bootstrap_config_includes_endpoint_params() -> None:
+    config = build_bootstrap_config()
+    assert "base_url = \"http://127.0.0.1:8080\"" in config
+    assert "completion_path = \"/completion\"" in config
+    assert "timeout_s = 120.0" in config
+    assert 'stop = ["<|return|>", "<|call|>"]' in config
