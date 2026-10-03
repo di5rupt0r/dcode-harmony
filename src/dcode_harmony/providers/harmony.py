@@ -202,6 +202,12 @@ class HarmonyCompletionChatModel(BaseChatModel):
     ) -> Any:
         """Bind tools to the model for Harmony function calling."""
         formatted = [convert_to_openai_tool(tool) for tool in tools]
+        if tool_choice is not None and tool_choice != "auto":
+            raise ValueError(
+                f"Unsupported tool_choice {tool_choice!r}: Harmony completion "
+                "only supports 'auto' (default) — tool selection is implicit "
+                "in the model's channel/recipient output"
+            )
         return self.bind(tools=formatted, **kwargs)
 
     def _payload(

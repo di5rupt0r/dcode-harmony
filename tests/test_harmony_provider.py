@@ -383,3 +383,23 @@ def test_post_method_is_used() -> None:
     )
     model.invoke([HumanMessage("hi")])
     assert captured["method"] == "POST"
+
+
+def test_bind_tools_tool_choice_auto_accepted() -> None:
+    def apply_patch(patch: str) -> str:
+        """Apply a patch."""
+        return patch
+
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b")
+    bound = model.bind_tools([apply_patch], tool_choice="auto")
+    assert bound is not None
+
+
+def test_bind_tools_tool_choice_unsupported_rejected() -> None:
+    def apply_patch(patch: str) -> str:
+        """Apply a patch."""
+        return patch
+
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b")
+    with pytest.raises(ValueError, match="tool_choice"):
+        model.bind_tools([apply_patch], tool_choice="required")
