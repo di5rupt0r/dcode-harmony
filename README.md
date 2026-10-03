@@ -2,7 +2,7 @@
 
 Standalone, plug-and-play distribution layer for running dcode with a local GPT-OSS model served by `llama-server` through the native Harmony/raw-completion protocol.
 
-> **Status: PR #1 (M1–M4).** Installable `dcode` launcher, native Harmony provider (token prompt, token parse, tool binding, tool history, SSE streaming), and a containment-safe `apply_patch` tool. Live server validation (M5) and release/lockfile policy (M6) are follow-up PRs.
+> **Status: PR #1 (M1–M5 DONE).** Installable `dcode` launcher, native Harmony provider (token prompt, token parse, tool binding, tool history, SSE streaming), a containment-safe `apply_patch` tool, and live validation against the real llama-server (M5, 2026-10-02). Release/lockfile policy (M6) is a follow-up PR.
 
 ## Goals
 
@@ -164,7 +164,7 @@ Validated against a real local server:
     Patch\n*** Add File: hello.txt\n+hi\n*** End Patch"}}` and the patch was
     applied to disk by the real tool.
 - Live suite result: `6 passed` (health, token contract, invoke, stream,
-  tool-call execution, SSE fields). Full suite: `78 passed` (unit + live).
+  tool-call execution, SSE fields). Full suite: `88 passed` (unit + live).
   `ruff check` and `ruff format --check` pass; `ty check src/` passes.
 
 Repeat with:
