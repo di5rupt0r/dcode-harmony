@@ -114,7 +114,14 @@ a running llama-server (M5) and CI or an equivalent local gate is wired.
 - llama-server became available: `llama-server -hfr unsloth/gpt-oss-20b-GGUF -cmoe -fa on -ctk q8_0 -ctv q4_0 -t 4` on 127.0.0.1:8080 (GPT-OSS 20B GGUF, ~6 GB RSS).
 - First `pytest -m live`: 6 failed/1 passed/1 skipped because the model was still loading and old tests used small timeouts and lax assertions.
 - Second run (server warm): 3 failed/5 passed/1 skipped, failures are old live tests timing out (httpx.ReadTimeout at 10–30 s budgets) — model is slow on CPU/low RAM.
-- Round scope per operator prompt: harden live tests, dedupe streaming tool-call counting, close `analysis` leak on no-token SSE events, secure `Move to` rollback, TOCTOU decision, strengthen tool-binding/tool_choice contract, honest docs (M5 one`- `GPT_OSS 20B GGUF (unsloth/gpt-oss-20b-GGUF), `llama-server -hfr unsloth/gpt-oss-20b-GGUF -cmoe -fa on -ctk q8_0 -ctv q4_0 -t 4`, 127.0.0.1:8080`
-- `/health`: initially `503 {"error":{"message":"Loading model"...}}` during model load; after ~5 min, `200`.
+- Round scope per operator prompt: harden live tests, dedupe streaming
+  tool-call counting, close `analysis` leak on no-token SSE events, secure
+  `Move to` rollback, TOCTOU decision, strengthen tool binding/tool_choice
+  contract, honest docs (M5 only after real validation).
+- Server facts: GPT-OSS 20B GGUF (unsloth/gpt-oss-20b-GGUF);
+  launch: `llama-server -hfr unsloth/gpt-oss-20b-GGUF -cmoe -fa on -ctk
+  q8_0 -ctv q4_0 -t 4`; endpoint http://127.0.0.1:8080.
+- `/health`: initially `503 {"error":{"message":"Loading model"...}}` during
+  model load; after ~5 min, `200`.
 - Old live tests `test_live_llama_server_normal_completion` / `_error_handling` / `_completion_smoke` failed with `httpx.ReadTimeout` (10–30 s budgets too small for this CPU-only host).
 - Passing: provider integration, harmony parsing, streaming, tool-call shape, normal completion (after generous timeout), health shape.
