@@ -101,7 +101,7 @@ Decisions recorded:
 - Streaming is real SSE (`stream: true`); analysis channel content is never
   emitted as visible chunks; tool calls surface as complete chunks on close.
 - Multi-file patches validate before writing and roll back on failure.
-- No dnf packages installed; with the `uv`-managed interpreter was sufficient.
+- No dnf packages installed; the `uv`-managed interpreter was sufficient.
 
 Remaining risks: live validation pending; no CI (default local pytest is the
 gate); lockfile policy (M6) deferred; tool-call partial args not streamed.
@@ -298,6 +298,18 @@ Decisions:
    results, live scope), keeping every existing fact verbatim where true.
 4. Suite-count claims must match the last real run (2026-10-03: 91 passed,
    6 live-deselected; full run 97 passed).
+
+### 2026-10-03 — PR #2 docs standardization (result)
+
+- README TOC added; Portuguese sections ("Escopo da validação",
+  "Validado live", "Não validado live") translated to English; scope
+  wording de-personalized (no stale "this PR" pointers); PT recommendation
+  lines translated; typo fixed.
+- HANDOFF session log kept append-only; current-state header now points to
+  PR #2. MILESTONES header now states PR #1 merged M1–M5, PR #2/#3/#4 roles.
+- Validation: docs-only diff vs main (`git diff main --stat` → *.md only);
+  `pytest -m "not live" -q` → 91 passed, 6 deselected (unchanged; expected,
+  no code touched).
 
 ### 2026-10-03 — Rollback coverage narrowed to post-planning failure
 
