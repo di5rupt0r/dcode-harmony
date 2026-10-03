@@ -288,6 +288,18 @@ language and structure, and polish aesthetics. Docs-only PR; the test-first
 rule is N/A at the code level — validation is (a) real `pytest` counts cited,
 (b) all relative links resolve, (c) no code diffs.
 
+Addendum (same PR, user feedback): the README was too polluted and WIP-looking.
+Restructure per user direction:
+
+- Adopt the Diátaxis model (tutorials / how-to guides / reference /
+  explanation) under `docs/`.
+- README becomes a lean entry point: one-paragraph intro, quickstart, status
+  badges-as-list, and links into `docs/`.
+- Add `llms.txt` at root: an index of every doc file with a one-line summary,
+  so AI agents can navigate without scraping.
+- HANDOFF.md / MILESTONES.md / AGENTS.md stay at root (agent-facing protocol
+  docs); user/operational docs move under `docs/`.
+
 Decisions:
 
 1. Documentation language is English across all files (AGENTS.md already is;
