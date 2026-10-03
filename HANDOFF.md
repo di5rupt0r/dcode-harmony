@@ -125,3 +125,28 @@ a running llama-server (M5) and CI or an equivalent local gate is wired.
   model load; after ~5 min, `200`.
 - Old live tests `test_live_llama_server_normal_completion` / `_error_handling` / `_completion_smoke` failed with `httpx.ReadTimeout` (10–30 s budgets too small for this CPU-only host).
 - Passing: provider integration, harmony parsing, streaming, tool-call shape, normal completion (after generous timeout), health shape.
+
+### 2026-10-02 — Live-validation and hardening round (results)
+
+- Commits: start `3d35398` → live-rewrite `e9492be` → SSE sentinel fix
+  `70911bc` → dedupe/leak `1686c92` → tool_choice `b595ad2` → full cycle
+  `2a98b10` → Move-rollback hardening `8828692` → TOCTOU doc `7169e9c` →
+  HTTP error tests `03ad1ba` → ruff/lint `c848d13` → M5 DONE `009ea4c`.
+- Tests written before code each time (recorded failing runs in session):
+  streaming dedupe/leak matrix (`2c0786c`), Move/rollback/newlines
+  (`e970c6a`), tool_choice rejection, HTTP error contract.
+- Real server facts: model `unsloth/gpt-oss-20b-GGUF`, endpoint
+  127.0.0.1:8080; `/health` 200 when loaded, 503 while loading; SSE events
+  carry `index/content/tokens/stop/id_slot/tokens_predicted/tokens_evaluated`;
+  no `[DONE]` sentinel (stream ends with `stop: true`).
+- Real probes: invoke returned `content="ok"`; stream gave 8 chunks
+  `"1, 2, 3"`; bind_tools produced a genuine
+  `functions.apply_patch` call with a valid patch that created hello.txt.
+- Suite totals: `pytest -q` → 78 passed; `pytest -m live` → 6 passed;
+  `ruff check` + `ruff format --check` pass; `ty check src/` clean.
+- Clean env: `uv pip install .` + `DEEPAGENTS_HOME=$(mktemp -d) dcode
+  --help` works, config.toml created, no `~/.dcode-harmony` leakage.
+- `python -m build` succeeds.
+- Recommendation: M5 criteria are now genuinely met; remaining gate before
+  merge is operator CI wiring (M6). Code/documentation state is consistent;
+  leave merge decision to the maintainer.
