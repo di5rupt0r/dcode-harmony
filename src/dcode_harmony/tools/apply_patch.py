@@ -210,6 +210,8 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
         if op.move_to is not None:
             target = _resolve_workspace_path(workspace, op.move_to)
             _check_path_safety(workspace, target)
+            if target.exists() or target.is_symlink():
+                raise PatchError(f"move destination already exists: {op.move_to}")
         if op.kind == "add":
             if source.exists() or source.is_symlink():
                 raise PatchError(f"Cannot add existing file: {op.path}")
@@ -292,26 +294,44 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
     planned = _plan(patch, workspace)
     results: list[str] = []
     applied: list[_PlannedOp] = []
+    created_dirs: list[Path] = []
     try:
         for item in planned:
             path = item.source
             target = item.target
+            parent = target.parent
+            missing_parents = []
+            probe = parent
+            while not probe.exists():
+                missing_parents.append(probe)
+                probe = probe.parent
             if item.op.kind == "add":
-                target.parent.mkdir(parents=True, exist_ok=True)
+                parent.mkdir(parents=True, exist_ok=True)
+                created_dirs.extend(missing_parents)
                 _write_bytes_secure(target, item.new_bytes or b"")
+                applied.append(item)
                 results.append(f"Added {item.op.path}")
             elif item.op.kind == "delete":
                 _unlink_secure(path)
+                applied.append(item)
                 results.append(f"Deleted {item.op.path}")
             else:
-                target.parent.mkdir(parents=True, exist_ok=True)
+                parent.mkdir(parents=True, exist_ok=True)
+                created_dirs.extend(missing_parents)
                 _write_bytes_secure(target, item.new_bytes or b"")
+                applied.append(item)
                 if target != path:
-                    _unlink_secure(path)
+                    try:
+                        _unlink_secure(path)
+                    except OSError:
+                        _unlink_secure(target)
+                        if item.original_bytes is not None:
+                            _write_bytes_secure(path, item.original_bytes)
+                        applied.pop()
+                        raise
                     results.append(f"Updated {item.op.path} -> {item.op.move_to}")
                 else:
                     results.append(f"Updated {item.op.path}")
-            applied.append(item)
     except Exception:
         for item in reversed(applied):
             try:
@@ -326,6 +346,12 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
                         _unlink_secure(item.target)
                     if item.original_bytes is not None:
                         _write_bytes_secure(item.source, item.original_bytes)
+            except OSError:
+                pass
+        # Remove directories the patch created (deepest first, only if empty).
+        for directory in sorted(created_dirs, key=lambda p: len(p.parts), reverse=True):
+            try:
+                directory.rmdir()
             except OSError:
                 pass
         raise
