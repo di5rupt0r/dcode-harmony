@@ -35,8 +35,10 @@ For every fix or feature, do the work in this order only:
 
 ## Before / after checklist
 
-**Before changing code:** read `AGENTS.md`, `HANDOFF.md`, `README.md`, and `MILESTONES.md`.
+**Before changing code:** read `AGENTS.md`, `HANDOFF.md`, `README.md`, and `MILESTONES.md`. User/operational docs live under `docs/` (index: `docs/README.md`, machine-readable: `llms.txt`).
 
 **After changing code:** run `pytest -m "not live"`, report real pass/fail counts, update milestone status, and leave a single clear session entry in `HANDOFF.md` (no long "picked up where X left off" logs).
+
+**After adding/moving/removing docs:** keep `docs/README.md`, `llms.txt`, and MILESTONES/HANDOFF references in sync; every docs page must declare its Diátaxis type in a blockquote at the top.
 
 Cursor agents also load `.cursor/rules/agent-handoff.mdc` (`alwaysApply: true`). Keep that file aligned with this document.
