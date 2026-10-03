@@ -188,7 +188,5 @@ def test_text_without_tokens_does_not_leak_harmony_markup() -> None:
         base_url="http://127.0.0.1:8080",
         transport=httpx.MockTransport(handler),
     )
-    chunks = list(model.stream([HumanMessage("hi")]))
-    text = "".join(c.content for c in chunks if isinstance(c.content, str))
-    assert "secret" not in text
-    assert "<|" not in text
+    with pytest.raises(ValueError, match="Harmony markup"):
+        list(model.stream([HumanMessage("hi")]))

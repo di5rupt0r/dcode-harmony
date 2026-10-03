@@ -267,6 +267,7 @@ class HarmonyCompletionChatModel(BaseChatModel):
         endpoint = f"{self.base_url.rstrip('/')}{self.completion_path}"
         parser = StreamableParser(_ENCODING, Role.ASSISTANT)
         emitted_tool_messages = 0
+        raw_fallback: list[str] = []
         with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
             with client.stream("POST", endpoint, json=payload) as response:
                 response.raise_for_status()
@@ -300,15 +301,17 @@ class HarmonyCompletionChatModel(BaseChatModel):
                                 message=AIMessageChunk(content="".join(final_deltas))
                             )
                     else:
+                        # Tokens are authoritative for channel filtering. When
+                        # the server omits them we cannot distinguish analysis
+                        # from final text, so we buffer and fail loudly if the
+                        # buffered text contains Harmony markup instead of
+                        # leaking raw channels to the UI.
                         content = event.get("content")
                         if isinstance(content, str) and content:
-                            yield ChatGenerationChunk(
-                                message=AIMessageChunk(content=content)
-                            )
+                            raw_fallback.append(content)
                     messages_so_far = parser.messages
                     for msg in messages_so_far[emitted_tool_messages:]:
                         recipient = msg.recipient if hasattr(msg, "recipient") else None
-                        channel = msg.channel
                         if isinstance(recipient, str) and recipient.startswith("functions."):
                             text = _content_text(msg.to_dict().get("content", ""))
                             tool_name = recipient.split(".", 1)[1]
@@ -330,28 +333,14 @@ class HarmonyCompletionChatModel(BaseChatModel):
                                         ],
                                     )
                                 )
-                    emitted_tool_messages += 1
-        # Flush any trailing tool calls not yet emitted (missing <|call|> terminator).
-        for msg in parser.messages[emitted_tool_messages:]:
-            recipient = msg.recipient if hasattr(msg, "recipient") else None
-            if isinstance(recipient, str) and recipient.startswith("functions."):
-                text = _content_text(msg.to_dict().get("content", ""))
-                tool_name = recipient.split(".", 1)[1]
-                try:
-                    tool_args = json.loads(text) if text else {}
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(tool_args, dict):
-                    yield ChatGenerationChunk(
-                        message=AIMessageChunk(
-                            content="",
-                            tool_calls=[
-                                {
-                                    "name": tool_name,
-                                    "args": tool_args,
-                                    "id": f"call_{uuid.uuid4().hex}",
-                                    "type": "tool_call",
-                                }
-                            ],
-                        )
-                    )
+                    emitted_tool_messages = len(messages_so_far)
+        # Fallback: no token-bearing events at all.
+        if not parser.tokens and raw_fallback:
+            joined = "".join(raw_fallback)
+            if "<|" in joined:
+                raise ValueError(
+                    "Stream without tokens contains raw Harmony markup; "
+                    "cannot safely separate channels"
+                )
+            if joined:
+                yield ChatGenerationChunk(message=AIMessageChunk(content=joined))
