@@ -132,6 +132,8 @@ def _find_hunk_position(
     haystack: list[str], needle: list[str], start: int, *, require_eof: bool = False
 ) -> int:
     if not needle:
+        if require_eof:
+            return len(haystack)
         return start
     matches = [
         idx
@@ -194,6 +196,15 @@ def _apply_update(
     return body
 
 
+def _mode_of(path: Path) -> int | None:
+    try:
+        import stat as _stat
+
+        return _stat.S_IMODE(os.stat(path).st_mode)
+    except OSError:
+        return None
+
+
 @dataclass
 class _PlannedOp:
     op: Operation
@@ -201,6 +212,7 @@ class _PlannedOp:
     target: Path
     new_bytes: bytes | None  # None means delete
     original_bytes: bytes | None
+    original_mode: int | None = None  # permission bits of source before patch
 
 
 def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
@@ -252,7 +264,9 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
                 raise PatchError(f"Cannot delete missing file: {op.path}")
             if source.exists() and source.is_dir():
                 raise PatchError(f"Cannot delete directory: {op.path}")
-            planned.append(_PlannedOp(op, source, target, None, original))
+            planned.append(
+                _PlannedOp(op, source, target, None, original, _mode_of(source))
+            )
             state[source] = None
             continue
         if op.kind == "update":
@@ -267,7 +281,14 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
                 raise PatchError(f"Cannot update non-UTF-8 file: {op.path}") from exc
             updated = _apply_update(text, op.lines, end_of_file=op.end_of_file)
             planned.append(
-                _PlannedOp(op, source, target, updated.encode("utf-8"), original)
+                _PlannedOp(
+                    op,
+                    source,
+                    target,
+                    updated.encode("utf-8"),
+                    original,
+                    _mode_of(source),
+                )
             )
             if target != source:
                 state[target] = updated.encode("utf-8")
@@ -276,6 +297,16 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
                 state[source] = updated.encode("utf-8")
             continue
         raise PatchError(f"Unsupported operation: {op.kind}")
+    for item in planned:
+        if item.new_bytes is None:
+            continue  # deletes only unlink
+        probe = item.target.parent
+        while not probe.exists():
+            probe = probe.parent
+        if not os.access(probe, os.W_OK):
+            raise PatchError(
+                f"Parent directory not writable: {probe} (needed for {item.target})"
+            )
     return planned
 
 
@@ -286,11 +317,13 @@ def _open_parent_fd(path: Path) -> int:
         raise PatchError(f"Parent directory does not exist: {path.parent}") from exc
 
 
-def _write_bytes_secure(path: Path, data: bytes) -> None:
+def _write_bytes_secure(path: Path, data: bytes, mode: int | None = None) -> None:
     """Write fully to a temp file in the same directory, then atomically
-    replace the target. A failed write never leaves a truncated target."""
+    replace the target. A failed write never leaves a truncated target.
+    `mode` (permission bits) is applied to the staged file before replace
+    so the target keeps its mode across updates and rollback."""
     dir_fd = _open_parent_fd(path)
-    tmp_name = f".{path.name}.dcode-tmp-{os.getpid()}-{os.urandom(4).hex()}"
+    tmp_name = f".dcode-tmp-{os.getpid()}-{os.urandom(4).hex()}"
     try:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         fd = os.open(tmp_name, flags, 0o644, dir_fd=dir_fd)
@@ -309,7 +342,16 @@ def _write_bytes_secure(path: Path, data: bytes) -> None:
             except OSError:
                 pass
             raise
-        os.replace(tmp_name, path.name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        if mode is not None:
+            os.chmod(tmp_name, mode, dir_fd=dir_fd)
+        try:
+            os.replace(tmp_name, path.name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
+        except Exception:
+            try:
+                os.unlink(tmp_name, dir_fd=dir_fd)
+            except OSError:
+                pass
+            raise
     finally:
         os.close(dir_fd)
 
@@ -355,7 +397,7 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
             if item.op.kind == "add":
                 parent.mkdir(parents=True, exist_ok=True)
                 created_dirs.extend(missing_parents)
-                _write_bytes_secure(target, item.new_bytes or b"")
+                _write_bytes_secure(target, item.new_bytes or b"", mode=item.original_mode)
                 applied.append(item)
                 results.append(f"Added {item.op.path}")
             elif item.op.kind == "delete":
@@ -365,7 +407,7 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
             else:
                 parent.mkdir(parents=True, exist_ok=True)
                 created_dirs.extend(missing_parents)
-                _write_bytes_secure(target, item.new_bytes or b"")
+                _write_bytes_secure(target, item.new_bytes or b"", mode=item.original_mode)
                 applied.append(item)
                 if target != path:
                     try:
@@ -373,7 +415,7 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
                     except OSError:
                         _unlink_secure(target)
                         if item.original_bytes is not None:
-                            _write_bytes_secure(path, item.original_bytes)
+                            _write_bytes_secure(path, item.original_bytes, mode=item.original_mode)
                         applied.pop()
                         raise
                     results.append(f"Updated {item.op.path} -> {item.op.move_to}")
@@ -387,12 +429,16 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
                         _unlink_secure(item.target)
                 elif item.op.kind == "delete":
                     if item.original_bytes is not None:
-                        _write_bytes_secure(item.source, item.original_bytes)
+                        _write_bytes_secure(
+                            item.source, item.original_bytes, mode=item.original_mode
+                        )
                 else:
                     if item.target != item.source and item.target.exists():
                         _unlink_secure(item.target)
                     if item.original_bytes is not None:
-                        _write_bytes_secure(item.source, item.original_bytes)
+                        _write_bytes_secure(
+                            item.source, item.original_bytes, mode=item.original_mode
+                        )
             except OSError:
                 pass
         # Remove directories the patch created (deepest first, only if empty).
