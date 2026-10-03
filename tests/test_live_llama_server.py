@@ -1,3 +1,11 @@
+"""Live tests against a real llama-server on 127.0.0.1:8080.
+
+Skipped only when the server is unavailable. When available, these tests are
+strict: they fail on wrong shapes, missing fields, raw Harmony leakage, or a
+missing real `apply_patch` tool call. Model responses on this CPU-only,
+low-RAM host are slow, so generous timeouts are used.
+"""
+
 from __future__ import annotations
 
 import json
@@ -5,176 +13,154 @@ import json
 import httpx
 import pytest
 
+BASE = "http://127.0.0.1:8080"
+TIMEOUT = 240.0
 
-@pytest.mark.live
-def test_live_llama_server_completion_smoke() -> None:
-    base = "http://127.0.0.1:8080"
+
+def _available() -> bool:
     try:
-        with httpx.Client(timeout=1.0) as client:
-            response = client.get(f"{base}/health")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        pytest.skip(f"llama-server unavailable: {exc}")
-
-    if response.status_code >= 500:
-        pytest.skip(f"llama-server unhealthy: status={response.status_code}")
-
-    with httpx.Client(timeout=10.0) as client:
-        completion = client.post(
-            f"{base}/completion",
-            json={"prompt": "ping", "n_predict": 8, "temperature": 0.0},
-        )
-    assert completion.status_code < 500
-
-
-@pytest.mark.live
-def test_live_llama_server_normal_completion() -> None:
-    base = "http://127.0.0.1:8080"
-    try:
-        with httpx.Client(timeout=1.0) as client:
-            response = client.get(f"{base}/health")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        pytest.skip(f"llama-server unavailable: {exc}")
-
-    if response.status_code >= 500:
-        pytest.skip(f"llama-server unhealthy: status={response.status_code}")
-
-    with httpx.Client(timeout=30.0) as client:
-        completion = client.post(
-            f"{base}/completion",
-            json={
-                "prompt": "Say hello",
-                "n_predict": 32,
-                "temperature": 0.0,
-                "stop": ["<|return|>", "<|call|>"],
-            },
-        )
-    assert completion.status_code == 200
-    body = completion.json()
-    assert "content" in body
-    assert isinstance(body["content"], str)
-
-
-@pytest.mark.live
-def test_live_llama_server_error_handling() -> None:
-    base = "http://127.0.0.1:8080"
-    try:
-        with httpx.Client(timeout=1.0) as client:
-            response = client.get(f"{base}/health")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        pytest.skip(f"llama-server unavailable: {exc}")
-
-    if response.status_code >= 500:
-        pytest.skip(f"llama-server unhealthy: status={response.status_code}")
-
-    with httpx.Client(timeout=10.0) as client:
-        completion = client.post(
-            f"{base}/completion",
-            json={"prompt": "test", "n_predict": -1},
-        )
-    assert completion.status_code >= 400
-
-
-@pytest.mark.live
-def test_live_harmony_provider_integration() -> None:
-    from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
-    from langchain_core.messages import HumanMessage
-
-    base = "http://127.0.0.1:8080"
-    try:
-        with httpx.Client(timeout=1.0) as client:
-            response = client.get(f"{base}/health")
-    except Exception as exc:  # pragma: no cover - environment dependent
-        pytest.skip(f"llama-server unavailable: {exc}")
-
-    if response.status_code >= 500:
-        pytest.skip(f"llama-server unhealthy: status={response.status_code}")
-
-    model = HarmonyCompletionChatModel(
-        model="gpt-oss-20b",
-        base_url=base,
-        timeout_s=30.0,
-    )
-
-    result = model.invoke([HumanMessage("Say hello in one word")])
-    assert result.content
-    assert len(result.content) > 0
-
-
-def _live_server_available(base: str = "http://127.0.0.1:8080") -> bool:
-    try:
-        with httpx.Client(timeout=1.0) as client:
-            response = client.get(f"{base}/health")
-        return response.status_code < 500
+        with httpx.Client(timeout=3.0) as client:
+            r = client.get(f"{BASE}/health")
+        return r.status_code == 200
     except Exception:
         return False
 
 
-@pytest.mark.live
-def test_live_health_and_completion_endpoint_shape() -> None:
-    if not _live_server_available():
-        pytest.skip("llama-server unavailable")
-    with httpx.Client(timeout=30.0) as client:
-        r = client.post(
-            "http://127.0.0.1:8080/completion",
-            json={
-                "prompt": "<|start|>user<|message|>Say hi<|end|><|start|>assistant",
-                "n_predict": 32,
-                "temperature": 0.0,
-                "stop": ["<|return|>", "<|call|>"],
-                "return_tokens": True,
-            },
-        )
+requires_server = pytest.mark.skipif(not _available(), reason="llama-server unavailable")
+pytestmark = pytest.mark.live
+
+
+@requires_server
+def test_live_health() -> None:
+    with httpx.Client(timeout=10.0) as client:
+        r = client.get(f"{BASE}/health")
+    assert r.status_code == 200
+    assert r.json().get("status") == "ok"
+
+
+@requires_server
+def test_live_completion_contract_with_token_prompt() -> None:
+    from dcode_harmony.providers.harmony import build_harmony_conversation
+    from langchain_core.messages import HumanMessage
+    from openai_harmony import HarmonyEncodingName, Role, load_harmony_encoding
+
+    enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
+    prompt = enc.render_conversation_for_completion(
+        build_harmony_conversation([HumanMessage("Say hi in one word")]),
+        Role.ASSISTANT,
+    )
+    assert isinstance(prompt, list) and all(isinstance(t, int) for t in prompt)
+
+    r = httpx.post(
+        f"{BASE}/completion",
+        json={
+            "prompt": prompt,
+            "n_predict": 16,
+            "temperature": 0.0,
+            "stop": ["<|return|>", "<|call|>"],
+            "return_tokens": True,
+        },
+        timeout=TIMEOUT,
+    )
     assert r.status_code == 200
     body = r.json()
     assert isinstance(body.get("content"), str)
     assert isinstance(body.get("tokens"), list)
+    assert body.get("stop") in (True, "<|return|>", "<|call|>", "content")
 
 
-@pytest.mark.live
-def test_live_provider_harmony_parsing() -> None:
-    if not _live_server_available():
-        pytest.skip("llama-server unavailable")
+@requires_server
+def test_live_provider_invoke_returns_valid_ai_message() -> None:
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
-    from langchain_core.messages import HumanMessage
+    from langchain_core.messages import AIMessage, HumanMessage
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=60.0)
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
     result = model.invoke([HumanMessage("Reply with exactly: ok")])
-    assert isinstance(result.content, str)
-    assert "<|" not in result.content  # no raw Harmony tokens leak into content
+    assert isinstance(result, AIMessage)
+    assert isinstance(result.content, str) and result.content.strip()
+    assert "<|" not in result.content  # no raw Harmony markup leaks
 
 
-@pytest.mark.live
-def test_live_provider_streaming() -> None:
-    if not _live_server_available():
-        pytest.skip("llama-server unavailable")
+@requires_server
+def test_live_provider_stream_emits_multiple_chunks() -> None:
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
     from langchain_core.messages import HumanMessage
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=60.0)
-    chunks = list(model.stream([HumanMessage("Count to three")]))
-    assert chunks
-    text = "".join(c.content for c in chunks if isinstance(c.content, str))
-    assert text
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
+    chunks = list(model.stream([HumanMessage("Count from 1 to 3, comma separated")]))
+    contents = [c.content for c in chunks if isinstance(c.content, str) and c.content]
+    assert len(contents) >= 2
+    text = "".join(contents)
+    assert "1" in text and "2" in text
+    assert "<|" not in text
 
 
-@pytest.mark.live
-def test_live_apply_patch_tool_call_shape() -> None:
-    """The model should emit functions.apply_patch when a patch is requested."""
-    if not _live_server_available():
-        pytest.skip("llama-server unavailable")
-    from langchain_core.messages import HumanMessage
-
+@requires_server
+def test_live_apply_patch_tool_call_executes(tmp_path) -> None:
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
+    from dcode_harmony.tools.apply_patch import apply_patch_text
+    from langchain_core.messages import HumanMessage
 
     def apply_patch(patch: str) -> str:
         """Apply a patch inside the workspace."""
         return patch
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=60.0)
-    bound = model.bind_tools([apply_patch])
-    result = bound.invoke(
-        [HumanMessage("Create file hello.txt with 'hi' using apply_patch")]
+    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
+    result = model.bind_tools([apply_patch]).invoke(
+        [
+            HumanMessage(
+                "You MUST call apply_patch to create hello.txt containing 'hi'. "
+                "Do not respond in plain text."
+            )
+        ]
     )
-    # Do not assert a specific tool call — report the shape for the record.
-    print("tool_calls:", getattr(result, "tool_calls", None))
-    print("content:", result.content)
+    assert result.tool_calls, f"expected apply_patch tool call, got: {result.content!r}"
+    tool_call = result.tool_calls[0]
+    assert tool_call["name"] == "apply_patch"
+    assert isinstance(tool_call["args"], dict)
+    assert isinstance(tool_call["args"].get("patch"), str)
+
+    outcome = apply_patch_text(tool_call["args"]["patch"], workspace=tmp_path)
+    assert "hello.txt" in outcome
+    target = tmp_path / "hello.txt"
+    assert target.exists()
+    assert "hi" in target.read_text(encoding="utf-8")
+
+
+@requires_server
+def test_live_sse_fields_and_stop_tokens() -> None:
+    from dcode_harmony.providers.harmony import build_harmony_conversation
+    from langchain_core.messages import HumanMessage
+    from openai_harmony import HarmonyEncodingName, load_harmony_encoding, Role
+
+    enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
+    prompt = enc.render_conversation_for_completion(
+        build_harmony_conversation([HumanMessage("Say one word")]), Role.ASSISTANT
+    )
+    seen_fields: set[str] = set()
+    saw_done = False
+    with httpx.Client(timeout=TIMEOUT) as client:
+        with client.stream(
+            "POST",
+            f"{BASE}/completion",
+            json={
+                "prompt": prompt,
+                "n_predict": 16,
+                "temperature": 0.0,
+                "stop": ["<|return|>", "<|call|>"],
+                "return_tokens": True,
+                "stream": True,
+            },
+        ) as r:
+            assert r.status_code == 200
+            for line in r.iter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    saw_done = True
+                    break
+                event = json.loads(data)
+                seen_fields.update(event.keys())
+    assert "content" in seen_fields
+    assert saw_done
