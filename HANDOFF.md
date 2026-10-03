@@ -189,3 +189,38 @@ Recommendation: **aprovar após condição X** — as the round required, all
 gates pass; the only outstanding item is M6 (CI/lockfile/release policy),
 which must land as a follow-up PR before calling the project fully
 maintainable. No merge was performed.
+
+### 2026-10-02 — Review-fix round 2 (same-path composition, EOF anchor, atomic writes, docs)
+
+Commits: `befdcf3` (failing tests), `2716b1c` (same-path virtual state in
+`_plan`, EOF-anchored ambiguity filter, atomic tmp+replace writes, move
+rollback test), `4af0924` (M5/README sync), `c1c227c` (launcher env-override
+test via real `run_dcode`), `18b6063` (format/validation).
+
+- `_plan` now tracks virtual bytes per path so repeated Add/Update/Delete/
+  Move on the same path compose in order (previously second write silently
+  overwrote the first).
+- `*** End of File` now disambiguates context: EOF-anchored hunk filters
+  matches to those ending at file end before the ambiguity check.
+- `_write_bytes_secure` writes to a temp file in the same directory,
+  fsyncs, then `os.replace`s — a failed write never truncates the target.
+- Rollback covers the move window (destination unlinked, source restored),
+  and directories created during a reverted patch are removed.
+- Rollback of a move verified by a real I/O failure (unwritable
+  subdirectory), no internal mocking.
+- MILESTONES M5 scope text aligned (no longer says "follow-up PR"); README
+  no longer contradicts the live-validation section.
+- Launcher test now exercises `run_dcode`'s DEEPAGENTS_HOME selection
+  directly.
+
+Final validation (this host, this round):
+
+- `pytest -m "not live" -q` → **82 passed, 6 deselected**
+- `pytest -m live -q` → **6 passed** (server live)
+- `pytest -q` → **88 passed**
+- `ruff check .` → pass; `ruff format --check .` → pass; `ty check src/` → pass
+- clean install + `dcode --help` OK; `python -m build` OK
+
+Recommendation: **aprovar após condição X** — all gates pass and docs are
+consistent; M6 (CI/lockfile/release) remains the explicit follow-up. No
+merge performed.
