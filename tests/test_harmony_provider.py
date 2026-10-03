@@ -184,8 +184,7 @@ def test_bind_tools_includes_tool_in_prompt() -> None:
 
     body = captured["body"]
     assert isinstance(body["prompt"], list)
-    # Verify tools are passed through (will be in the rendered conversation)
-    assert body["prompt"]  # Just verify it's a token list
+    assert all(isinstance(t, int) for t in body["prompt"])
 
 
 def test_model_exposes_tool_calling_profile() -> None:
