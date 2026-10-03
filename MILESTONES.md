@@ -80,9 +80,10 @@ Acceptance criteria (this PR):
 - long filenames near the component limit work (short random temp names);
 - non-writable parent directories are rejected at planning with a clear
   `PatchError`;
-- rollback is verified against a real I/O failure (unwritable subdirectory),
+- rollback is verified against a post-planning execution failure,
   restoring source bytes, destination state, and modes, and removing
-  directories created by the patch.
+  directories created by the patch (`test_rollback_after_post_planning_failure`,
+  with the same documented syscall-boundary injection as other fault tests).
 
 ## M4 — Plug-and-play launcher and model selection — DONE
 

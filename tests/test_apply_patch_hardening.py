@@ -541,3 +541,44 @@ def test_failed_chmod_leaves_no_staged_temp(tmp_path: Path, monkeypatch) -> None
     leftovers = [p.name for p in tmp_path.iterdir() if ".dcode-tmp-" in p.name]
     assert leftovers == []
     assert target.read_text(encoding="utf-8") == "old\n"
+
+
+def test_rollback_after_post_planning_failure(tmp_path: Path, monkeypatch) -> None:
+    """Execution-time failure must roll back earlier writes.
+
+    `_plan` passes (real dirs are writable), so this isolates the rollback
+    path. The failure is injected at the syscall boundary (`os.replace`) —
+    no user-space trigger reaches mid-execution (see other tests).
+    """
+    import os
+    import stat
+
+    import dcode_harmony.tools.apply_patch as ap
+
+    target = tmp_path / "existing.txt"
+    target.write_text("old\n", encoding="utf-8")
+    target.chmod(0o755)
+    real_replace = ap.os.replace
+
+    def _replace_boom(src, dst, **kwargs):
+        if dst == "new.txt":
+            raise OSError("simulated rename failure")
+        return real_replace(src, dst, **kwargs)
+
+    monkeypatch.setattr(ap.os, "replace", _replace_boom)
+    patch = """*** Begin Patch
+*** Update File: existing.txt
+@@
+-old
++new
+*** Add File: sub/new.txt
++x
+*** End Patch
+"""
+    with pytest.raises(OSError, match="simulated rename failure"):
+        apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "old\n"
+    assert stat.S_IMODE(os.stat(target).st_mode) == 0o755
+    assert not (tmp_path / "sub").exists()
+    leftovers = [p.name for p in tmp_path.rglob("*") if ".dcode-tmp-" in p.name]
+    assert leftovers == []
