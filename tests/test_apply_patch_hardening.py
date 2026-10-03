@@ -356,3 +356,126 @@ def test_failed_write_leaves_original_file_intact(tmp_path: Path) -> None:
         assert blocked.read_text(encoding="utf-8") == "keep\n"
     finally:
         blocked_dir.chmod(0o755)
+
+
+def test_eof_insertion_only_hunk_appends(tmp_path: Path) -> None:
+    target = tmp_path / "tail.txt"
+    target.write_text("head\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: tail.txt
+@@
++tail
+*** End of File
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "head\ntail\n"
+
+
+def test_executable_mode_preserved_on_update(tmp_path: Path) -> None:
+    import os
+    import stat
+
+    target = tmp_path / "deploy.sh"
+    target.write_text("#!/bin/sh\nold\n", encoding="utf-8")
+    target.chmod(0o755)
+    patch = """*** Begin Patch
+*** Update File: deploy.sh
+@@
+-old
++new
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert stat.S_IMODE(os.stat(target).st_mode) == 0o755
+    assert target.read_text(encoding="utf-8") == "#!/bin/sh\nnew\n"
+
+
+def test_rollback_restores_executable_mode(tmp_path: Path) -> None:
+    import os
+    import stat
+
+    good = tmp_path / "run.sh"
+    good.write_text("one\nold\n", encoding="utf-8")
+    good.chmod(0o755)
+    blocked_dir = tmp_path / "blocked"
+    blocked_dir.mkdir()
+    blocked_dir.chmod(0o555)
+    try:
+        patch = """*** Begin Patch
+*** Update File: run.sh
+@@
+-old
++new
+*** Add File: blocked/new.txt
++x
+*** End Patch
+"""
+        with pytest.raises((PatchError, OSError)):
+            apply_patch_text(patch, workspace=tmp_path)
+        assert stat.S_IMODE(os.stat(good).st_mode) == 0o755
+        assert good.read_text(encoding="utf-8") == "one\nold\n"
+    finally:
+        blocked_dir.chmod(0o755)
+
+
+def test_long_filename_near_component_limit_works(tmp_path: Path) -> None:
+    name = "a" * 240 + ".txt"
+    target = tmp_path / name
+    target.write_text("one\nold\n", encoding="utf-8")
+    patch = f"""*** Begin Patch
+*** Update File: {name}
+@@
+-old
++new
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "one\nnew\n"
+
+
+def test_writable_file_in_readonly_directory_fails_clearly(tmp_path: Path) -> None:
+    blocked_dir = tmp_path / "ro"
+    blocked_dir.mkdir()
+    target = blocked_dir / "notes.txt"
+    target.write_text("x\n", encoding="utf-8")
+    target.chmod(0o666)
+    blocked_dir.chmod(0o555)
+    try:
+        patch = """*** Begin Patch
+*** Update File: ro/notes.txt
+@@
+-x
++y
+*** End Patch
+"""
+        with pytest.raises(PatchError, match="not writable"):
+            apply_patch_text(patch, workspace=tmp_path)
+    finally:
+        blocked_dir.chmod(0o755)
+
+
+def test_failed_replace_leaves_no_staged_temp(tmp_path: Path, monkeypatch) -> None:
+    import dcode_harmony.tools.apply_patch as ap
+
+    target = tmp_path / "a.txt"
+    target.write_text("old\n", encoding="utf-8")
+    real_replace = ap.os.replace
+
+    def _boom(src, dst, **kwargs):
+        raise OSError("simulated rename failure")
+
+    monkeypatch.setattr(ap.os, "replace", _boom)
+    patch = """*** Begin Patch
+*** Update File: a.txt
+@@
+-old
++new
+*** End Patch
+"""
+    with pytest.raises(OSError, match="simulated rename failure"):
+        apply_patch_text(patch, workspace=tmp_path)
+    monkeypatch.setattr(ap.os, "replace", real_replace)
+    leftovers = [p.name for p in tmp_path.iterdir() if ".dcode-tmp-" in p.name]
+    assert leftovers == []
+    assert target.read_text(encoding="utf-8") == "old\n"
