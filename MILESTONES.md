@@ -83,7 +83,8 @@ Acceptance criteria (this PR, unit-level):
 
 ## M5 — Live llama-server validation — DONE
 
-Tracked in a follow-up PR (do not implement on PR #1).
+Completed on PR #1 (2026-10-02). The earlier "follow-up PR" note referred
+to the pre-live state and is obsolete; scope below is what was validated.
 
 Acceptance criteria:
 

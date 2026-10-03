@@ -39,10 +39,10 @@ python -m pytest -m "not live"  # unit/integration tests, no server needed
 python -m pytest -m live     # requires llama-server on 127.0.0.1:8080
 ```
 
-Live tests exercise `/health`, `/completion`, Harmony parsing, streaming, and
-the `apply_patch` tool-call shape. They were **not executed against a real
-server on this machine** — no llama-server was running and the host lacks
-~12 GB free RAM for the 20B Q4_K_M model.
+Live tests exercise `/health`, `/completion`, token prompt shape, provider
+invoke, streaming, SSE fields/terminal stop, and real `apply_patch` tool-call
+execution. They were executed against the real server on 2026-10-02
+(`6 passed`) — see *Live validation* below.
 
 ## apply_patch safety
 
