@@ -72,6 +72,37 @@ exists, without waiting for the full test matrix.
 - Not claimed: nothing has been implemented yet on this branch; only the
   decision record.
 
+### 2026-10-03 — PR #6a trace harness implementation
+
+Implemented the execution-trace harness for provider runs. Test-side only —
+zero `src/` changes.
+
+**Files created:**
+- `tests/_trace.py` — `TracingTransport(httpx.BaseTransport)` wrapper that
+  records request/response pairs and per-SSE-event timing for streaming
+  responses. Also provides `trace_event()` for test-side annotations and
+  `get_trace_dir()` for the trace directory.
+- `tests/conftest.py` — pytest plugin: `--trace-dir` CLI option,
+  `DCODE_TRACE_DIR` env var, `tracing_transport` fixture, and
+  `pytest_runtest_makereport` hook that writes per-test JSONL trace files and
+  prints the path on failure.
+- `tests/test_trace_harness.py` — 18 unit tests for the harness itself (record
+  schema, streaming SSE recording, error capture, zero-overhead default).
+- `docs/how-to/debug-agent-runs.md` — how-to guide for reading traces.
+
+**Files modified:**
+- `tests/test_live_llama_server.py` — live tests that create
+  `HarmonyCompletionChatModel` now accept the `tracing_transport` fixture.
+- `docs/README.md` — added link to new how-to guide.
+- `llms.txt` — added entry for new how-to guide.
+
+**Validation:**
+- `pytest -m "not live" -q` → **109 passed, 6 deselected** (91 original + 18
+  new trace harness tests).
+- Zero-overhead verified: no trace files written when `DCODE_TRACE_DIR` is
+  unset.
+- No live validation claimed (no llama-server on this host).
+
 ### 2026-10-02 — PR #1 (M1–M4)
 
 This session closes PR #1 as a finished M1–M4 unit. Implementation follows this handoff: native Harmony render/parse/bind/history/SSE streaming, dir_fd `apply_patch`, launcher `None`→0 and home override tests. M5/M6 remain TODO.

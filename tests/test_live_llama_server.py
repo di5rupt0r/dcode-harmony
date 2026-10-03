@@ -73,12 +73,14 @@ def test_live_completion_contract_with_token_prompt() -> None:
 
 
 @requires_server
-def test_live_provider_invoke_returns_valid_ai_message() -> None:
+def test_live_provider_invoke_returns_valid_ai_message(tracing_transport) -> None:
     from langchain_core.messages import AIMessage, HumanMessage
 
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", timeout_s=TIMEOUT, transport=tracing_transport
+    )
     result = model.invoke([HumanMessage("Reply with exactly: ok")])
     assert isinstance(result, AIMessage)
     assert isinstance(result.content, str) and result.content.strip()
@@ -86,12 +88,14 @@ def test_live_provider_invoke_returns_valid_ai_message() -> None:
 
 
 @requires_server
-def test_live_provider_stream_emits_multiple_chunks() -> None:
+def test_live_provider_stream_emits_multiple_chunks(tracing_transport) -> None:
     from langchain_core.messages import HumanMessage
 
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", timeout_s=TIMEOUT, transport=tracing_transport
+    )
     chunks = list(model.stream([HumanMessage("Count from 1 to 3, comma separated")]))
     contents = [c.content for c in chunks if isinstance(c.content, str) and c.content]
     assert len(contents) >= 2
@@ -101,7 +105,7 @@ def test_live_provider_stream_emits_multiple_chunks() -> None:
 
 
 @requires_server
-def test_live_apply_patch_tool_call_executes(tmp_path) -> None:
+def test_live_apply_patch_tool_call_executes(tmp_path, tracing_transport) -> None:
     from langchain_core.messages import HumanMessage
 
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
@@ -111,7 +115,9 @@ def test_live_apply_patch_tool_call_executes(tmp_path) -> None:
         """Apply a patch inside the workspace."""
         return patch
 
-    model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", timeout_s=TIMEOUT, transport=tracing_transport
+    )
     result = model.bind_tools([apply_patch]).invoke(
         [
             HumanMessage(
