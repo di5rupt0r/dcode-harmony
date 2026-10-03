@@ -319,9 +319,17 @@ Decisions:
   lines translated; typo fixed.
 - HANDOFF session log kept append-only; current-state header now points to
   PR #2. MILESTONES header now states PR #1 merged M1–M5, PR #2/#3/#4 roles.
-- Validation: docs-only diff vs main (`git diff main --stat` → *.md only);
-  `pytest -m "not live" -q` → 91 passed, 6 deselected (unchanged; expected,
-  no code touched).
+- Validation: all relative links in README/docs/llms.txt resolve
+  (scripted check → none broken); `pytest -m "not live" -q` → 91 passed,
+  6 deselected (no code touched). Docs diff vs main remains docs-only.
+- Addendum (2026-10-03, user feedback): README judged too polluted/WIP.
+  Restructured to a lean entry point + Diátaxis `docs/` tree
+  (tutorials/getting-started, how-to install/run-llama-server/
+  configure-profile/run-tests, reference architecture/configuration/
+  dependencies/error-contract/apply-patch, explanation design-decisions/
+  live-validation), `docs/README.md` index, and root `llms.txt` for
+  AI-agent navigation. AGENTS.md now mandates keeping those indexes in
+  sync and a Diátaxis blockquote on every docs page.
 
 ### 2026-10-03 — Rollback coverage narrowed to post-planning failure
 
