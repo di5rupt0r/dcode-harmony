@@ -150,3 +150,42 @@ a running llama-server (M5) and CI or an equivalent local gate is wired.
 - Recommendation: M5 criteria are now genuinely met; remaining gate before
   merge is operator CI wiring (M6). Code/documentation state is consistent;
   leave merge decision to the maintainer.
+
+### 2026-10-02 — Final consistency round (P0 parsing, docs, SSE, errors, tests)
+
+Commits this round: `e1fad88` (parse fallback fix), `caf5b0f`/`89ecb4b`
+(docs sync + live scope), `8a5a374` (SSE test contract), `ba451aa` (error
+contract doc), `dcafed3` (stronger assertion), `0a69eed` (format pass).
+
+- P0 fixes landed: `parse_harmony_completion` no longer unpacks JSON-looking
+  text (`"42"`, `"{}"`, `'["a","b"]'` are plain content); empty payload+
+  tokens → empty `AIMessage`; non-empty tokens always take priority. Failing
+  tests added first and recorded; JSON-envelope removal confirmed against all
+  call sites (no production caller passed invented JSON — only stale tests,
+  which were migrated to real token streams).
+- Docs synchronized: README/MILESTONES/HANDOFF all say M1–M5 DONE, live
+  validated 2026-10-02 against `unsloth/gpt-oss-20b-GGUF` on
+  http://127.0.0.1:8080 (`llama-server -hfr unsloth/gpt-oss-20b-GGUF -cmoe
+  -fa on -ctk q8_0 -ctv q4_0 -t 4`); live result 6 passed; M6 TODO; no CI
+  claims; explicit list of what live validation did and did not cover.
+- Synthetic SSE tests now model the real contract (events → `stop: true` →
+  close; no `[DONE]`); a single compatibility test keeps `[DONE]` accepted.
+- Error contract fixed to Option B (propagate httpx; no unified wrapper);
+  README section added; MILESTONES claim aligned.
+- Live apply_patch test retains strict assertions and applies the patch in
+  `tmp_path`.
+
+Final validation (this host, this round):
+
+- `pytest -m "not live" -q` → **77 passed, 6 deselected**
+- `pytest -m live -q` → **6 passed** (server up: gpt-oss-20b GGUF)
+- `pytest -q` → **83 passed**
+- `ruff check .` → pass; `ruff format --check .` → pass; `ty check src/` → pass
+- clean venv: `uv pip install .` OK; `DEEPAGENTS_HOME=$(mktemp -d) dcode
+  --help` prints deepagents-code v0.1.80
+- `python -m build` → wheel + sdist
+
+Recommendation: **aprovar após condição X** — as the round required, all
+gates pass; the only outstanding item is M6 (CI/lockfile/release policy),
+which must land as a follow-up PR before calling the project fully
+maintainable. No merge was performed.
