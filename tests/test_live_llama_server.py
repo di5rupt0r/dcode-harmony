@@ -139,6 +139,7 @@ def test_live_sse_fields_and_stop_tokens() -> None:
     )
     seen_fields: set[str] = set()
     saw_done = False
+    saw_stop = False
     with httpx.Client(timeout=TIMEOUT) as client:
         with client.stream(
             "POST",
@@ -162,5 +163,10 @@ def test_live_sse_fields_and_stop_tokens() -> None:
                     break
                 event = json.loads(data)
                 seen_fields.update(event.keys())
+                if event.get("stop") is True:
+                    saw_stop = True
     assert "content" in seen_fields
-    assert saw_done
+    assert "tokens" in seen_fields
+    # llama-server /completion streams end with a stop:true event and close;
+    # it does not send a "[DONE]" sentinel.
+    assert saw_stop or saw_done
