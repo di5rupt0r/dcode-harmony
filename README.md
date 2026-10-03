@@ -4,6 +4,24 @@ Standalone, plug-and-play distribution layer for running dcode with a local GPT-
 
 > **Status: PR #1 (M1–M5 DONE).** Installable `dcode` launcher, native Harmony provider (token prompt, token parse, tool binding, tool history, SSE streaming), a containment-safe `apply_patch` tool, and live validation against the real llama-server (M5, 2026-10-02). Release/lockfile policy (M6) is a follow-up PR.
 
+## Contents
+
+- [Goals](#goals)
+- [Current scope](#current-scope)
+- [Test validation](#test-validation)
+- [apply_patch safety](#apply_patch-safety)
+- [Current user experience](#current-user-experience)
+- [Dependency policy](#dependency-policy)
+- [Architecture](#architecture)
+- [Test-first rule](#test-first-rule)
+- [Live validation](#live-validation-2026-10-02-real-server)
+- [Validation scope](#validation-scope)
+- [Documentation and handoff](#documentation-and-handoff)
+- [Error contract](#error-contract)
+- [Differences from upstream dcode](#differences-from-upstream-dcode)
+- [Limitations](#limitations)
+- [License and provenance](#license-and-provenance)
+
 ## Goals
 
 The finished project will be installable independently from the upstream `deepagents` monorepo. It will use the published `deepagents-code` package as the dcode runtime and keep `deepagents` as an explicitly pinned external dependency. The local integration layer will:
@@ -17,7 +35,7 @@ The finished project will be installable independently from the upstream `deepag
 - remain reproducible through pinned dependencies and a lockfile;
 - be developed strictly test-first.
 
-## Current scope (this PR)
+## Current scope
 
 - pinned package dependencies for `deepagents-code`, `deepagents`, and `openai-harmony`;
 - `dcode` launcher bootstrap that writes an isolated `~/.dcode-harmony/config.toml` (overridable with `DEEPAGENTS_HOME`);
@@ -28,7 +46,7 @@ The finished project will be installable independently from the upstream `deepag
 - verified clean-environment install (`python -m pip install .`, `dcode --help`, `python -m build`).
 
 Validated live on 2026-10-02 against the real server (M5 DONE — see
-*Live validation* below). Not in this PR: CI, lockfile/versioning policy
+*Live validation* below). Still open: CI, lockfile/versioning policy
 (M6).
 
 ## Test validation
@@ -69,7 +87,7 @@ execution. They were executed against the real server on 2026-10-02
 
 ## Current user experience
 
-After this PR's packaging/launcher work:
+After the packaging/launcher work:
 
 ```bash
 git clone https://github.com/di5rupt0r/dcode-harmony.git
@@ -173,27 +191,27 @@ Repeat with:
 pytest -m live -q       # needs the server on 127.0.0.1:8080
 ```
 
-## Escopo da validação
+## Validation scope
 
-### Validado live (2026-10-02, servidor real)
+### Validated live (2026-10-02, real server)
 
 - `/health`;
-- prompt Harmony como token list;
+- Harmony prompt as token list;
 - `return_tokens=true`;
-- invoke do provider;
-- streaming real;
-- tool call real para `apply_patch`;
-- aplicação real do patch em workspace temporário;
-- campos SSE e término por `stop: true`.
+- provider invoke;
+- real streaming;
+- real tool call to `apply_patch`;
+- real patch application in a temporary workspace;
+- SSE fields and termination by `stop: true`.
 
-### Não validado live
+### Not validated live
 
-- sessão TUI completa de longa duração;
-- múltiplos ciclos de ferramentas;
-- recuperação de sessão;
-- comportamento sob falta de memória;
+- long-running full TUI session;
+- multiple tool cycles;
+- session recovery;
+- behavior under out-of-memory;
 - systemd restart/recovery;
-- CI remoto.
+- remote CI.
 
 ## Documentation and handoff
 

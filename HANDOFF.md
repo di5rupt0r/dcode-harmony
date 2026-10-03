@@ -101,7 +101,7 @@ Decisions recorded:
 - Streaming is real SSE (`stream: true`); analysis channel content is never
   emitted as visible chunks; tool calls surface as complete chunks on close.
 - Multi-file patches validate before writing and roll back on failure.
-- No dnf packages installed; wei `uv`-managed interpreter was sufficient.
+- No dnf packages installed; with the `uv`-managed interpreter was sufficient.
 
 Remaining risks: live validation pending; no CI (default local pytest is the
 gate); lockfile policy (M6) deferred; tool-call partial args not streamed.
@@ -185,7 +185,7 @@ Final validation (this host, this round):
   --help` prints deepagents-code v0.1.80
 - `python -m build` → wheel + sdist
 
-Recommendation: **aprovar após condição X** — as the round required, all
+Recommendation: **approve after condition X** — as the round required, all
 gates pass; the only outstanding item is M6 (CI/lockfile/release policy),
 which must land as a follow-up PR before calling the project fully
 maintainable. No merge was performed.
@@ -221,7 +221,7 @@ Final validation (this host, this round):
 - `ruff check .` → pass; `ruff format --check .` → pass; `ty check src/` → pass
 - clean install + `dcode --help` OK; `python -m build` OK
 
-Recommendation: **aprovar após condição X** — all gates pass and docs are
+Recommendation: **approve after condition X** — all gates pass and docs are
 consistent; M6 (CI/lockfile/release) remains the explicit follow-up. No
 merge performed.
 
@@ -251,7 +251,7 @@ Final validation (this host):
 - `pytest -q` → **94 passed**
 - `ruff check .` / `ruff format --check .` → pass; `ty check src/` → pass
 
-Recommendation: **aprovar após condição X** — M6 (CI/lockfile/release) is
+Recommendation: **approve after condition X** — M6 (CI/lockfile/release) is
 the only remaining follow-up. No merge performed.
 
 ### 2026-10-02 — Review-fix round 4 (virtual modes, chmod cleanup, README count)
@@ -279,7 +279,7 @@ chmod-failure test), `4007c30` (README count, syscall-boundary docs).
 Final validation: `pytest -q` → **96 passed**; ruff check/format pass;
 `ty check src/` pass.
 
-Recommendation: **aprovar após condição X** — M6 follow-up only. No merge.
+Recommendation: **approve after condition X** — M6 follow-up only. No merge.
 
 ### 2026-10-03 — PR #2 docs standardization (start)
 
