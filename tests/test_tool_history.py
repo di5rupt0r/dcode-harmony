@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
 from dcode_harmony.providers.harmony import build_harmony_conversation
-from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
 _ENCODING = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
 
@@ -53,7 +53,9 @@ def test_tool_message_renders_as_tool_author() -> None:
                     }
                 ],
             ),
-            ToolMessage(content="Updated a.txt", tool_call_id="call_1", name="apply_patch"),
+            ToolMessage(
+                content="Updated a.txt", tool_call_id="call_1", name="apply_patch"
+            ),
         ]
     )
     # Tool response rendered with the tool author, not as a user message.

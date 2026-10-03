@@ -5,14 +5,13 @@ import json
 import httpx
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.utils.function_calling import convert_to_openai_tool
+from openai_harmony import HarmonyEncodingName, Role, load_harmony_encoding
 
 from dcode_harmony.providers.harmony import (
     HarmonyCompletionChatModel,
     build_harmony_conversation,
     parse_harmony_completion,
 )
-from openai_harmony import HarmonyEncodingName, load_harmony_encoding, Role
 
 
 def test_build_harmony_conversation_includes_system_and_tools() -> None:
@@ -66,7 +65,9 @@ def test_payload_uses_native_harmony_tokens() -> None:
 
     # Verify prompt ends with assistant generation prefix
     assistant_prefix_tokens = encoding.render_conversation_for_completion(
-        build_harmony_conversation([SystemMessage("Be helpful"), HumanMessage("Hello")]),
+        build_harmony_conversation(
+            [SystemMessage("Be helpful"), HumanMessage("Hello")]
+        ),
         Role.ASSISTANT,
     )
     assert body["prompt"] == assistant_prefix_tokens
@@ -76,11 +77,17 @@ def test_parse_harmony_completion_maps_tool_call() -> None:
     from openai_harmony import Message
 
     # Create Harmony messages directly
-    tool_call_msg = Message.from_role_and_content(
-        Role.ASSISTANT,
-        '{"patch":"*** Begin Patch\\n*** End Patch\\n"}',
-    ).with_channel("commentary").with_recipient("functions.apply_patch")
-    final_msg = Message.from_role_and_content(Role.ASSISTANT, "done").with_channel("final")
+    tool_call_msg = (
+        Message.from_role_and_content(
+            Role.ASSISTANT,
+            '{"patch":"*** Begin Patch\\n*** End Patch\\n"}',
+        )
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
+    final_msg = Message.from_role_and_content(Role.ASSISTANT, "done").with_channel(
+        "final"
+    )
 
     # Convert to the format parse_harmony_completion expects
     completion = json.dumps([tool_call_msg.to_dict(), final_msg.to_dict()])
@@ -98,10 +105,14 @@ def test_parse_harmony_completion_maps_tool_call() -> None:
 def test_parse_harmony_completion_rejects_malformed_tool_args() -> None:
     from openai_harmony import Message
 
-    tool_call_msg = Message.from_role_and_content(
-        Role.ASSISTANT,
-        "not-json",
-    ).with_channel("commentary").with_recipient("functions.apply_patch")
+    tool_call_msg = (
+        Message.from_role_and_content(
+            Role.ASSISTANT,
+            "not-json",
+        )
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
     completion = json.dumps([tool_call_msg.to_dict()])
 
     with pytest.raises(ValueError, match="Malformed tool-call"):
@@ -269,9 +280,11 @@ def test_parse_truncated_tokens_return_sane_ai_message() -> None:
 def test_parse_tool_call_with_whitespace_padded_json() -> None:
     from openai_harmony import Message
 
-    msg = Message.from_role_and_content(
-        Role.ASSISTANT, '  { "patch": "x" }  '
-    ).with_channel("commentary").with_recipient("functions.apply_patch")
+    msg = (
+        Message.from_role_and_content(Role.ASSISTANT, '  { "patch": "x" }  ')
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
     ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
     assert ai.tool_calls[0]["args"] == {"patch": "x"}
 
@@ -279,9 +292,11 @@ def test_parse_tool_call_with_whitespace_padded_json() -> None:
 def test_parse_tool_call_fragmented_json_across_content_items() -> None:
     from openai_harmony import Message
 
-    msg = Message.from_role_and_content(
-        Role.ASSISTANT, '{"pat' + 'ch": "y"}'
-    ).with_channel("commentary").with_recipient("functions.apply_patch")
+    msg = (
+        Message.from_role_and_content(Role.ASSISTANT, '{"pat' + 'ch": "y"}')
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
     ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
     assert ai.tool_calls[0]["args"] == {"patch": "y"}
 
@@ -289,9 +304,11 @@ def test_parse_tool_call_fragmented_json_across_content_items() -> None:
 def test_parse_unknown_recipient_tool_is_not_registered_error() -> None:
     from openai_harmony import Message
 
-    msg = Message.from_role_and_content(Role.ASSISTANT, '{"x": 1}').with_channel(
-        "commentary"
-    ).with_recipient("functions.nonexistent_tool")
+    msg = (
+        Message.from_role_and_content(Role.ASSISTANT, '{"x": 1}')
+        .with_channel("commentary")
+        .with_recipient("functions.nonexistent_tool")
+    )
     # Parsing must not invent a registered tool; it records the call by name
     # and the runtime rejects unknown tools. The name must be preserved.
     ai = parse_harmony_completion(json.dumps([msg.to_dict()]))
@@ -306,12 +323,16 @@ def test_parse_plain_text_fallback_is_final_content() -> None:
 def test_parse_multiple_tool_calls() -> None:
     from openai_harmony import Message
 
-    m1 = Message.from_role_and_content(Role.ASSISTANT, '{"patch": "a"}').with_channel(
-        "commentary"
-    ).with_recipient("functions.apply_patch")
-    m2 = Message.from_role_and_content(Role.ASSISTANT, '{"patch": "b"}').with_channel(
-        "commentary"
-    ).with_recipient("functions.apply_patch")
+    m1 = (
+        Message.from_role_and_content(Role.ASSISTANT, '{"patch": "a"}')
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
+    m2 = (
+        Message.from_role_and_content(Role.ASSISTANT, '{"patch": "b"}')
+        .with_channel("commentary")
+        .with_recipient("functions.apply_patch")
+    )
     ai = parse_harmony_completion(json.dumps([m1.to_dict(), m2.to_dict()]))
     assert len(ai.tool_calls) == 2
     assert {c["args"]["patch"] for c in ai.tool_calls} == {"a", "b"}
@@ -367,7 +388,7 @@ def test_invalid_json_response_raises() -> None:
     model = HarmonyCompletionChatModel(
         model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         model.invoke([HumanMessage("hi")])
 
 
@@ -457,13 +478,17 @@ def test_truncated_sse_without_stop_still_yields_seen_tokens() -> None:
     from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
     enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
-    tokens = enc.encode("<|channel|>final<|message|>partial answer", allowed_special="all")
+    tokens = enc.encode(
+        "<|channel|>final<|message|>partial answer", allowed_special="all"
+    )
 
     def _handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
-            content=b"data: " + json.dumps({"content": "", "tokens": tokens}).encode() + b"\n\n",
+            content=b"data: "
+            + json.dumps({"content": "", "tokens": tokens}).encode()
+            + b"\n\n",
         )
 
     model = HarmonyCompletionChatModel(

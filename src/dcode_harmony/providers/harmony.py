@@ -4,23 +4,31 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from openai_harmony import (
-    StreamableParser,
     Author,
     Conversation,
     DeveloperContent,
     HarmonyEncodingName,
-    load_harmony_encoding,
     Message,
     Role,
+    StreamableParser,
     ToolDescription,
+    load_harmony_encoding,
 )
 from pydantic import Field
 
@@ -70,11 +78,21 @@ def build_harmony_conversation(
             content = str(message.content or "")
             if content.strip():
                 harmony_messages.append(
-                    Message.from_role_and_content(Role.ASSISTANT, content).with_channel("final")
+                    Message.from_role_and_content(Role.ASSISTANT, content).with_channel(
+                        "final"
+                    )
                 )
             for tool_call in getattr(message, "tool_calls", []) or []:
-                name = tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
-                args = tool_call.get("args", {}) if isinstance(tool_call, dict) else tool_call.args
+                name = (
+                    tool_call.get("name")
+                    if isinstance(tool_call, dict)
+                    else tool_call.name
+                )
+                args = (
+                    tool_call.get("args", {})
+                    if isinstance(tool_call, dict)
+                    else tool_call.args
+                )
                 harmony_messages.append(
                     Message.from_role_and_content(Role.ASSISTANT, json.dumps(args))
                     .with_channel("commentary")
@@ -83,7 +101,9 @@ def build_harmony_conversation(
         elif isinstance(message, ToolMessage):
             name = message.name or "tool"
             harmony_messages.append(
-                Message.from_author_and_content(Author.new(Role.TOOL, name), str(message.content))
+                Message.from_author_and_content(
+                    Author.new(Role.TOOL, name), str(message.content)
+                )
             )
         else:
             harmony_messages.append(
@@ -104,13 +124,17 @@ def _content_text(raw: Any) -> str:
     return ""
 
 
-def parse_harmony_completion(payload: str, tokens: list[int] | None = None) -> AIMessage:
+def parse_harmony_completion(
+    payload: str, tokens: list[int] | None = None
+) -> AIMessage:
     """Parse Harmony completion response into LangChain AIMessage."""
     # Tokens from `return_tokens` are authoritative; they parse even when the
     # text payload is empty (the server may send tokens only).
     if tokens:
         try:
-            messages = _ENCODING.parse_messages_from_completion_tokens(tokens, Role.ASSISTANT)
+            messages = _ENCODING.parse_messages_from_completion_tokens(
+                tokens, Role.ASSISTANT
+            )
         except Exception as exc:
             raise ValueError(f"Failed to parse completion tokens: {exc}") from exc
     else:
@@ -123,7 +147,9 @@ def parse_harmony_completion(payload: str, tokens: list[int] | None = None) -> A
                 data = [data]
             if not isinstance(data, list):
                 raise ValueError("Malformed Harmony response: expected JSON list/dict")
-            messages = [Message.from_dict(entry) for entry in data if isinstance(entry, dict)]
+            messages = [
+                Message.from_dict(entry) for entry in data if isinstance(entry, dict)
+            ]
         except json.JSONDecodeError:
             # Not JSON, treat as plain text final message
             return AIMessage(content=payload, tool_calls=[])
@@ -142,7 +168,9 @@ def parse_harmony_completion(payload: str, tokens: list[int] | None = None) -> A
             try:
                 tool_args = json.loads(text) if text else {}
             except json.JSONDecodeError as exc:
-                raise ValueError(f"Malformed tool-call arguments for {tool_name}") from exc
+                raise ValueError(
+                    f"Malformed tool-call arguments for {tool_name}"
+                ) from exc
             if not isinstance(tool_args, dict):
                 raise ValueError(f"Malformed tool-call arguments for {tool_name}")
             tool_calls.append(
@@ -218,7 +246,9 @@ class HarmonyCompletionChatModel(BaseChatModel):
         stream: bool = False,
     ) -> dict[str, Any]:
         conversation = build_harmony_conversation(messages, tools=tools)
-        prompt_tokens = _ENCODING.render_conversation_for_completion(conversation, Role.ASSISTANT)
+        prompt_tokens = _ENCODING.render_conversation_for_completion(
+            conversation, Role.ASSISTANT
+        )
         payload: dict[str, Any] = {
             "prompt": prompt_tokens,
             "n_predict": self.max_tokens,
@@ -274,72 +304,76 @@ class HarmonyCompletionChatModel(BaseChatModel):
         parser = StreamableParser(_ENCODING, Role.ASSISTANT)
         emitted_tool_messages = 0
         raw_fallback: list[str] = []
-        with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
-            with client.stream("POST", endpoint, json=payload) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data = line[len("data:") :].strip()
-                    if not data or data == "[DONE]":
-                        continue
-                    try:
-                        event = json.loads(data)
-                    except json.JSONDecodeError as exc:
-                        raise ValueError(f"Malformed streaming event: {data!r}") from exc
-                    if not isinstance(event, dict):
-                        raise ValueError("Malformed streaming event: expected object")
-                    chunk_tokens = event.get("tokens")
-                    if isinstance(chunk_tokens, list):
-                        final_deltas: list[str] = []
-                        for token in chunk_tokens:
-                            if isinstance(token, int):
-                                parser.process(token)
-                                delta = parser.last_content_delta
-                                if (
-                                    isinstance(delta, str)
-                                    and delta
-                                    and parser.current_channel == "final"
-                                ):
-                                    final_deltas.append(delta)
-                        if final_deltas:
+        with (
+            httpx.Client(timeout=self.timeout_s, transport=self.transport) as client,
+            client.stream("POST", endpoint, json=payload) as response,
+        ):
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line[len("data:") :].strip()
+                if not data or data == "[DONE]":
+                    continue
+                try:
+                    event = json.loads(data)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"Malformed streaming event: {data!r}") from exc
+                if not isinstance(event, dict):
+                    raise ValueError("Malformed streaming event: expected object")
+                chunk_tokens = event.get("tokens")
+                if isinstance(chunk_tokens, list):
+                    final_deltas: list[str] = []
+                    for token in chunk_tokens:
+                        if isinstance(token, int):
+                            parser.process(token)
+                            delta = parser.last_content_delta
+                            if (
+                                isinstance(delta, str)
+                                and delta
+                                and parser.current_channel == "final"
+                            ):
+                                final_deltas.append(delta)
+                    if final_deltas:
+                        yield ChatGenerationChunk(
+                            message=AIMessageChunk(content="".join(final_deltas))
+                        )
+                else:
+                    # Tokens are authoritative for channel filtering. When
+                    # the server omits them we cannot distinguish analysis
+                    # from final text, so we buffer and fail loudly if the
+                    # buffered text contains Harmony markup instead of
+                    # leaking raw channels to the UI.
+                    content = event.get("content")
+                    if isinstance(content, str) and content:
+                        raw_fallback.append(content)
+                messages_so_far = parser.messages
+                for msg in messages_so_far[emitted_tool_messages:]:
+                    recipient = msg.recipient if hasattr(msg, "recipient") else None
+                    if isinstance(recipient, str) and recipient.startswith(
+                        "functions."
+                    ):
+                        text = _content_text(msg.to_dict().get("content", ""))
+                        tool_name = recipient.split(".", 1)[1]
+                        try:
+                            tool_args = json.loads(text) if text else {}
+                        except json.JSONDecodeError:
+                            tool_args = None
+                        if isinstance(tool_args, dict):
                             yield ChatGenerationChunk(
-                                message=AIMessageChunk(content="".join(final_deltas))
-                            )
-                    else:
-                        # Tokens are authoritative for channel filtering. When
-                        # the server omits them we cannot distinguish analysis
-                        # from final text, so we buffer and fail loudly if the
-                        # buffered text contains Harmony markup instead of
-                        # leaking raw channels to the UI.
-                        content = event.get("content")
-                        if isinstance(content, str) and content:
-                            raw_fallback.append(content)
-                    messages_so_far = parser.messages
-                    for msg in messages_so_far[emitted_tool_messages:]:
-                        recipient = msg.recipient if hasattr(msg, "recipient") else None
-                        if isinstance(recipient, str) and recipient.startswith("functions."):
-                            text = _content_text(msg.to_dict().get("content", ""))
-                            tool_name = recipient.split(".", 1)[1]
-                            try:
-                                tool_args = json.loads(text) if text else {}
-                            except json.JSONDecodeError:
-                                tool_args = None
-                            if isinstance(tool_args, dict):
-                                yield ChatGenerationChunk(
-                                    message=AIMessageChunk(
-                                        content="",
-                                        tool_calls=[
-                                            {
-                                                "name": tool_name,
-                                                "args": tool_args,
-                                                "id": f"call_{uuid.uuid4().hex}",
-                                                "type": "tool_call",
-                                            }
-                                        ],
-                                    )
+                                message=AIMessageChunk(
+                                    content="",
+                                    tool_calls=[
+                                        {
+                                            "name": tool_name,
+                                            "args": tool_args,
+                                            "id": f"call_{uuid.uuid4().hex}",
+                                            "type": "tool_call",
+                                        }
+                                    ],
                                 )
-                    emitted_tool_messages = len(messages_so_far)
+                            )
+                emitted_tool_messages = len(messages_so_far)
         # Fallback: no token-bearing events at all.
         if not parser.tokens and raw_fallback:
             joined = "".join(raw_fallback)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import stat
 from pathlib import Path
 
 import pytest
@@ -253,7 +251,7 @@ def test_rollback_restores_source_after_move_failure(tmp_path: Path) -> None:
 
 def test_empty_file_and_no_final_newline_and_crlf_and_unicode(tmp_path: Path) -> None:
     p = tmp_path / "unicode.txt"
-    p.write_bytes("olá\r\nfim".encode("utf-8"))  # CRLF + no trailing newline
+    p.write_bytes("olá\r\nfim".encode())  # CRLF + no trailing newline
     patch = """*** Begin Patch
 *** Update File: unicode.txt
 @@
@@ -263,4 +261,4 @@ def test_empty_file_and_no_final_newline_and_crlf_and_unicode(tmp_path: Path) ->
 *** End Patch
 """
     apply_patch_text(patch, workspace=tmp_path)
-    assert p.read_bytes() == "olá\r\nfim!".encode("utf-8")
+    assert p.read_bytes() == "olá\r\nfim!".encode()

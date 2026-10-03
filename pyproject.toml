@@ -36,3 +36,10 @@ addopts = ["-ra", "--strict-markers"]
 markers = [
     "live: requires external llama-server availability",
 ]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"src/dcode_harmony/providers/harmony.py" = ["TRY004"]
+"tests/*" = ["TRY004"]

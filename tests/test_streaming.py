@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 import httpx
+import pytest
 from langchain_core.messages import HumanMessage
+from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
 from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
-from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
 _ENCODING = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
 
 
 def _sse(lines: list[dict]) -> bytes:
-    return b"".join(
-        b"data: " + json.dumps(line).encode() + b"\n\n" for line in lines
-    ) + b"data: [DONE]\n\n"
+    return (
+        b"".join(b"data: " + json.dumps(line).encode() + b"\n\n" for line in lines)
+        + b"data: [DONE]\n\n"
+    )
 
 
 def _model(handler) -> HarmonyCompletionChatModel:
@@ -69,7 +69,15 @@ def test_stream_hides_analysis_channel_from_output() -> None:
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
-            content=_sse([{"content": "secret reasoning\nvisible", "tokens": tokens, "stop": True}]),
+            content=_sse(
+                [
+                    {
+                        "content": "secret reasoning\nvisible",
+                        "tokens": tokens,
+                        "stop": True,
+                    }
+                ]
+            ),
         )
 
     chunks = list(_model(handler).stream([HumanMessage("hi")]))
@@ -80,7 +88,7 @@ def test_stream_hides_analysis_channel_from_output() -> None:
 
 def test_stream_emits_tool_call_chunk() -> None:
     tokens = _ENCODING.encode(
-        'to=functions.apply_patch<|channel|>commentary json'
+        "to=functions.apply_patch<|channel|>commentary json"
         '<|message|>{"patch": "x"}<|call|>',
         allowed_special="all",
     )
@@ -89,7 +97,9 @@ def test_stream_emits_tool_call_chunk() -> None:
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
-            content=_sse([{"content": '{"patch": "x"}', "tokens": tokens, "stop": True}]),
+            content=_sse(
+                [{"content": '{"patch": "x"}', "tokens": tokens, "stop": True}]
+            ),
         )
 
     chunks = list(_model(handler).stream([HumanMessage("hi")]))
@@ -108,14 +118,10 @@ def test_stream_http_error_propagates() -> None:
         list(_model(handler).stream([HumanMessage("hi")]))
 
 
-
-
 def _sse_tokens(token_groups: list[list[int]]) -> bytes:
     lines = []
     for group in token_groups:
-        lines.append(
-            {"content": "", "tokens": group, "stop": False}
-        )
+        lines.append({"content": "", "tokens": group, "stop": False})
     lines.append({"content": "", "tokens": [], "stop": True})
     return b"".join(b"data: " + json.dumps(l).encode() + b"\n\n" for l in lines)
 
@@ -160,7 +166,9 @@ def test_fragmented_tool_call_across_events_emitted_once() -> None:
         allowed_special="all",
     )
     third = len(tokens) // 3
-    chunks = _run_stream_tokens([tokens[:third], tokens[third : 2 * third], tokens[2 * third :]])
+    chunks = _run_stream_tokens(
+        [tokens[:third], tokens[third : 2 * third], tokens[2 * third :]]
+    )
     tool_calls = [tc for c in chunks for tc in (c.tool_calls or [])]
     assert len(tool_calls) == 1
     assert tool_calls[0]["args"] == {"patch": "x"}
@@ -168,7 +176,9 @@ def test_fragmented_tool_call_across_events_emitted_once() -> None:
 
 def test_message_split_across_events_yields_full_text() -> None:
     enc = _ENCODING
-    tokens = enc.encode("<|channel|>final<|message|>hello there world<|return|>", allowed_special="all")
+    tokens = enc.encode(
+        "<|channel|>final<|message|>hello there world<|return|>", allowed_special="all"
+    )
     half = len(tokens) // 2
     chunks = _run_stream_tokens([tokens[:half], tokens[half:]])
     text = "".join(c.content for c in chunks if isinstance(c.content, str))

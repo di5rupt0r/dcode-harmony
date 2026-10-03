@@ -7,8 +7,6 @@ import importlib.metadata
 import importlib.util
 from pathlib import Path
 
-import pytest
-
 from deepagents_code.extensions.api import ExtensionAPI, ExtensionMode
 from deepagents_code.extensions.registry import ExtensionRegistry, SourceInfo
 
@@ -30,7 +28,9 @@ def _load_entry_module():
 def test_extension_registers_apply_patch_via_real_api(tmp_path: Path) -> None:
     module, origin = _load_entry_module()
     registry = ExtensionRegistry()
-    source = SourceInfo(Path(origin), is_package=True, source_id="dcode_harmony@entry-point")
+    source = SourceInfo(
+        Path(origin), is_package=True, source_id="dcode_harmony@entry-point"
+    )
     api = ExtensionAPI(registry, source, cwd=tmp_path, mode=ExtensionMode.HEADLESS)
 
     asyncio.run(module.extension(api))

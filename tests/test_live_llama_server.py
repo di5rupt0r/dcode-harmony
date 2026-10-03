@@ -22,11 +22,13 @@ def _available() -> bool:
         with httpx.Client(timeout=3.0) as client:
             r = client.get(f"{BASE}/health")
         return r.status_code == 200
-    except Exception:
+    except (httpx.HTTPError, OSError):
         return False
 
 
-requires_server = pytest.mark.skipif(not _available(), reason="llama-server unavailable")
+requires_server = pytest.mark.skipif(
+    not _available(), reason="llama-server unavailable"
+)
 pytestmark = pytest.mark.live
 
 
@@ -40,9 +42,10 @@ def test_live_health() -> None:
 
 @requires_server
 def test_live_completion_contract_with_token_prompt() -> None:
-    from dcode_harmony.providers.harmony import build_harmony_conversation
     from langchain_core.messages import HumanMessage
     from openai_harmony import HarmonyEncodingName, Role, load_harmony_encoding
+
+    from dcode_harmony.providers.harmony import build_harmony_conversation
 
     enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
     prompt = enc.render_conversation_for_completion(
@@ -71,8 +74,9 @@ def test_live_completion_contract_with_token_prompt() -> None:
 
 @requires_server
 def test_live_provider_invoke_returns_valid_ai_message() -> None:
-    from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
     from langchain_core.messages import AIMessage, HumanMessage
+
+    from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
 
     model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
     result = model.invoke([HumanMessage("Reply with exactly: ok")])
@@ -83,8 +87,9 @@ def test_live_provider_invoke_returns_valid_ai_message() -> None:
 
 @requires_server
 def test_live_provider_stream_emits_multiple_chunks() -> None:
-    from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
     from langchain_core.messages import HumanMessage
+
+    from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
 
     model = HarmonyCompletionChatModel(model="gpt-oss-20b", timeout_s=TIMEOUT)
     chunks = list(model.stream([HumanMessage("Count from 1 to 3, comma separated")]))
@@ -97,9 +102,10 @@ def test_live_provider_stream_emits_multiple_chunks() -> None:
 
 @requires_server
 def test_live_apply_patch_tool_call_executes(tmp_path) -> None:
+    from langchain_core.messages import HumanMessage
+
     from dcode_harmony.providers.harmony import HarmonyCompletionChatModel
     from dcode_harmony.tools.apply_patch import apply_patch_text
-    from langchain_core.messages import HumanMessage
 
     def apply_patch(patch: str) -> str:
         """Apply a patch inside the workspace."""
@@ -129,9 +135,10 @@ def test_live_apply_patch_tool_call_executes(tmp_path) -> None:
 
 @requires_server
 def test_live_sse_fields_and_stop_tokens() -> None:
-    from dcode_harmony.providers.harmony import build_harmony_conversation
     from langchain_core.messages import HumanMessage
-    from openai_harmony import HarmonyEncodingName, load_harmony_encoding, Role
+    from openai_harmony import HarmonyEncodingName, Role, load_harmony_encoding
+
+    from dcode_harmony.providers.harmony import build_harmony_conversation
 
     enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
     prompt = enc.render_conversation_for_completion(
@@ -140,8 +147,9 @@ def test_live_sse_fields_and_stop_tokens() -> None:
     seen_fields: set[str] = set()
     saw_done = False
     saw_stop = False
-    with httpx.Client(timeout=TIMEOUT) as client:
-        with client.stream(
+    with (
+        httpx.Client(timeout=TIMEOUT) as client,
+        client.stream(
             "POST",
             f"{BASE}/completion",
             json={
@@ -152,19 +160,20 @@ def test_live_sse_fields_and_stop_tokens() -> None:
                 "return_tokens": True,
                 "stream": True,
             },
-        ) as r:
-            assert r.status_code == 200
-            for line in r.iter_lines():
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data == "[DONE]":
-                    saw_done = True
-                    break
-                event = json.loads(data)
-                seen_fields.update(event.keys())
-                if event.get("stop") is True:
-                    saw_stop = True
+        ) as r,
+    ):
+        assert r.status_code == 200
+        for line in r.iter_lines():
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                saw_done = True
+                break
+            event = json.loads(data)
+            seen_fields.update(event.keys())
+            if event.get("stop") is True:
+                saw_stop = True
     assert "content" in seen_fields
     assert "tokens" in seen_fields
     # llama-server /completion streams end with a stop:true event and close;

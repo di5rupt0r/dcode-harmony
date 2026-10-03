@@ -10,19 +10,19 @@ from pathlib import Path
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from openai_harmony import HarmonyEncodingName, load_harmony_encoding
 
 from dcode_harmony.providers.harmony import (
     HarmonyCompletionChatModel,
     build_harmony_conversation,
 )
-from openai_harmony import HarmonyEncodingName, Role, load_harmony_encoding
 
 _ENCODING = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
 
 
 def _realistic_stream_response() -> bytes:
     tokens = _ENCODING.encode(
-        'to=functions.apply_patch<|channel|>commentary json'
+        "to=functions.apply_patch<|channel|>commentary json"
         '<|message|>{"patch": "*** Begin Patch\\n*** Add File: hi.txt\\n+hi\\n*** End Patch"}<|call|>',
         allowed_special="all",
     )
@@ -65,7 +65,7 @@ def test_full_tool_cycle_with_real_encoding_and_registry(tmp_path: Path) -> None
         rendered = _ENCODING.decode(body["prompt"])
         assert "functions.apply_patch" in rendered or "apply_patch" in rendered
         tokens = _ENCODING.encode(
-            'to=functions.apply_patch<|channel|>commentary json'
+            "to=functions.apply_patch<|channel|>commentary json"
             '<|message|>{"patch": "*** Begin Patch\\n*** Add File: hi.txt\\n+hi\\n*** End Patch"}<|call|>',
             allowed_special="all",
         )

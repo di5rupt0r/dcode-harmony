@@ -28,9 +28,9 @@ Safety properties:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 class PatchError(ValueError):
@@ -151,7 +151,9 @@ def _detect_newline(text: str) -> str:
     return "\n"
 
 
-def _apply_update(original: str, patch_lines: Iterable[str], *, end_of_file: bool) -> str:
+def _apply_update(
+    original: str, patch_lines: Iterable[str], *, end_of_file: bool
+) -> str:
     newline = _detect_newline(original)
     has_trailing = original.endswith(("\n", "\r"))
     source = original.splitlines()
@@ -215,7 +217,9 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
         if op.kind == "add":
             if source.exists() or source.is_symlink():
                 raise PatchError(f"Cannot add existing file: {op.path}")
-            new_bytes = ("\n".join(op.lines) + ("\n" if op.lines else "")).encode("utf-8")
+            new_bytes = ("\n".join(op.lines) + ("\n" if op.lines else "")).encode(
+                "utf-8"
+            )
             planned.append(_PlannedOp(op, source, target, new_bytes, None))
             continue
         if op.kind == "delete":
@@ -236,7 +240,9 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
             except UnicodeDecodeError as exc:
                 raise PatchError(f"Cannot update non-UTF-8 file: {op.path}") from exc
             updated = _apply_update(text, op.lines, end_of_file=op.end_of_file)
-            planned.append(_PlannedOp(op, source, target, updated.encode("utf-8"), original))
+            planned.append(
+                _PlannedOp(op, source, target, updated.encode("utf-8"), original)
+            )
             continue
         raise PatchError(f"Unsupported operation: {op.kind}")
     return planned
