@@ -224,3 +224,32 @@ Final validation (this host, this round):
 Recommendation: **aprovar após condição X** — all gates pass and docs are
 consistent; M6 (CI/lockfile/release) remains the explicit follow-up. No
 merge performed.
+
+### 2026-10-02 — Review-fix round 3 (atomic writes, EOF insertion, modes, long names, README)
+
+Commits: `3ad0a11` (failing tests), `32b3e0a` (mode preservation, EOF-insert
+append, short temp basenames, writable-parent check at plan time, staged-temp
+cleanup, tests), `a95f22e` (README status/counts sync), `d31ffbd` (format).
+
+- Insertion-only EOF hunks now append at `len(haystack)` (fix applied from
+  the review's suggestion, with a filesystem test).
+- Updates preserve the original permission bits (staged temp chmodded before
+  `os.replace`; rollback restores the original mode too).
+- Temp files use a short fixed prefix + random suffix — long names near the
+  component limit (240 bytes) work now.
+- Planning rejects writes whose target's parent directory is not writable,
+  with a clear `PatchError` — writable files in read-only dirs now fail at
+  planning time instead of mid-execution.
+- A failed `os.replace` unlinks the staged temp; no `.dcode-tmp-*` leftovers.
+- README status header and suite counts aligned (M1–M5 DONE, 88 tests,
+  live section consistent).
+
+Final validation (this host):
+
+- `pytest -m "not live" -q` → **88 passed, 6 deselected**
+- `pytest -m live -q` → **6 passed**
+- `pytest -q` → **94 passed**
+- `ruff check .` / `ruff format --check .` → pass; `ty check src/` → pass
+
+Recommendation: **aprovar após condição X** — M6 (CI/lockfile/release) is
+the only remaining follow-up. No merge performed.
