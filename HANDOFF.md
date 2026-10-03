@@ -280,3 +280,13 @@ Final validation: `pytest -q` → **96 passed**; ruff check/format pass;
 `ty check src/` pass.
 
 Recommendation: **aprovar após condição X** — M6 follow-up only. No merge.
+
+### 2026-10-03 — Rollback coverage narrowed to post-planning failure
+
+Commit `bfcbc1a`. Added `test_rollback_after_post_planning_failure`
+(execution-time `os.replace` failure for the second op rolls back the
+first update, restores mode, removes created dirs, leaves no staged
+temps). M3 milestone wording narrowed accordingly. The unwritable-dir
+tests remain as plan-time rejection, not rollback coverage.
+
+`pytest -m "not live" -q` → 91 passed, 6 deselected.
