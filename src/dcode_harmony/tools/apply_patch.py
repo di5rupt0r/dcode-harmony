@@ -397,7 +397,9 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
             if item.op.kind == "add":
                 parent.mkdir(parents=True, exist_ok=True)
                 created_dirs.extend(missing_parents)
-                _write_bytes_secure(target, item.new_bytes or b"", mode=item.original_mode)
+                _write_bytes_secure(
+                    target, item.new_bytes or b"", mode=item.original_mode
+                )
                 applied.append(item)
                 results.append(f"Added {item.op.path}")
             elif item.op.kind == "delete":
@@ -407,7 +409,9 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
             else:
                 parent.mkdir(parents=True, exist_ok=True)
                 created_dirs.extend(missing_parents)
-                _write_bytes_secure(target, item.new_bytes or b"", mode=item.original_mode)
+                _write_bytes_secure(
+                    target, item.new_bytes or b"", mode=item.original_mode
+                )
                 applied.append(item)
                 if target != path:
                     try:
@@ -415,7 +419,9 @@ def apply_patch_text(patch: str, *, workspace: Path) -> str:
                     except OSError:
                         _unlink_secure(target)
                         if item.original_bytes is not None:
-                            _write_bytes_secure(path, item.original_bytes, mode=item.original_mode)
+                            _write_bytes_secure(
+                                path, item.original_bytes, mode=item.original_mode
+                            )
                         applied.pop()
                         raise
                     results.append(f"Updated {item.op.path} -> {item.op.move_to}")
