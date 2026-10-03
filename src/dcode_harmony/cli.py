@@ -1,8 +1,8 @@
-"""CLI entry point placeholder for the bootstrap phase."""
+"""CLI entry point for plug-and-play dcode Harmony launcher."""
+
+from dcode_harmony.launcher import run_dcode
 
 
 def main() -> int:
-    """Fail clearly until the plug-and-play launcher is implemented."""
-    raise SystemExit(
-        "dcode-harmony bootstrap is not implemented yet; see HANDOFF.md and MILESTONES.md"
-    )
+    """Run upstream dcode with Harmony bootstrap defaults."""
+    return run_dcode()
