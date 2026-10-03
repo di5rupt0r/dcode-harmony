@@ -173,6 +173,28 @@ Repeat with:
 pytest -m live -q       # needs the server on 127.0.0.1:8080
 ```
 
+## Escopo da validação
+
+### Validado live (2026-10-02, servidor real)
+
+- `/health`;
+- prompt Harmony como token list;
+- `return_tokens=true`;
+- invoke do provider;
+- streaming real;
+- tool call real para `apply_patch`;
+- aplicação real do patch em workspace temporário;
+- campos SSE e término por `stop: true`.
+
+### Não validado live
+
+- sessão TUI completa de longa duração;
+- múltiplos ciclos de ferramentas;
+- recuperação de sessão;
+- comportamento sob falta de memória;
+- systemd restart/recovery;
+- CI remoto.
+
 ## Documentation and handoff
 
 - [`HANDOFF.md`](HANDOFF.md): operational state, decisions, validation, and continuation instructions.
