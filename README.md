@@ -164,7 +164,7 @@ Validated against a real local server:
     Patch\n*** Add File: hello.txt\n+hi\n*** End Patch"}}` and the patch was
     applied to disk by the real tool.
 - Live suite result: `6 passed` (health, token contract, invoke, stream,
-  tool-call execution, SSE fields). Full suite: `96 passed` (90 unit/integration + 6 live).
+  tool-call execution, SSE fields). Full suite: `97 passed` (91 unit/integration + 6 live).
   `ruff check` and `ruff format --check` pass; `ty check src/` passes.
 
 Repeat with:
