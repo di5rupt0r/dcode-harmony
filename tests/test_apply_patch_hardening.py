@@ -227,26 +227,31 @@ def test_rollback_removes_created_directories(tmp_path: Path) -> None:
 
 
 def test_rollback_restores_source_after_move_failure(tmp_path: Path) -> None:
-    # Force a post-move failure by placing a later operation that cannot be
-    # validated... validation runs first, so instead trigger a write failure
-    # at execution time via a second move into an existing path created by an
-    # earlier op in the same patch.
+    # Force a post-move failure at execution time: an add into an
+    # unwritable directory. The move must be rolled back with the source
+    # restored and the destination removed.
     (tmp_path / "one.txt").write_text("1\n", encoding="utf-8")
-    (tmp_path / "two.txt").write_text("2\n", encoding="utf-8")
-    patch = """*** Begin Patch
+    blocked_dir = tmp_path / "blocked"
+    blocked_dir.mkdir()
+    blocked_dir.chmod(0o555)
+    try:
+        patch = """*** Begin Patch
 *** Update File: one.txt
 *** Move to: moved.txt
 @@
 -1
 +1b
-*** Delete File: moved.txt
+*** Add File: blocked/new.txt
++x
 *** End Patch
 """
-    # Delete of missing file fails at validation -> nothing applied.
-    with pytest.raises(PatchError):
-        apply_patch_text(patch, workspace=tmp_path)
-    assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "1\n"
-    assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "2\n"
+        with pytest.raises((PatchError, OSError)):
+            apply_patch_text(patch, workspace=tmp_path)
+        assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "1\n"
+        assert not (tmp_path / "moved.txt").exists()
+        assert not (blocked_dir / "new.txt").exists()
+    finally:
+        blocked_dir.chmod(0o755)
 
 
 def test_empty_file_and_no_final_newline_and_crlf_and_unicode(tmp_path: Path) -> None:
@@ -326,9 +331,11 @@ def test_eof_anchored_hunk_ignores_earlier_duplicates(tmp_path: Path) -> None:
 def test_failed_write_leaves_original_file_intact(tmp_path: Path) -> None:
     good = tmp_path / "good.txt"
     good.write_text("one\nold\n", encoding="utf-8")
-    blocked = tmp_path / "blocked.txt"
+    blocked_dir = tmp_path / "blocked"
+    blocked_dir.mkdir()
+    blocked = blocked_dir / "blocked.txt"
     blocked.write_text("keep\n", encoding="utf-8")
-    blocked.chmod(0o444)
+    blocked_dir.chmod(0o555)
     try:
         patch = """*** Begin Patch
 *** Update File: good.txt
@@ -336,7 +343,7 @@ def test_failed_write_leaves_original_file_intact(tmp_path: Path) -> None:
  one
 -old
 +new
-*** Update File: blocked.txt
+*** Update File: blocked/blocked.txt
 @@
 -keep
 +changed
@@ -348,4 +355,4 @@ def test_failed_write_leaves_original_file_intact(tmp_path: Path) -> None:
         assert good.read_text(encoding="utf-8") == "one\nold\n"
         assert blocked.read_text(encoding="utf-8") == "keep\n"
     finally:
-        blocked.chmod(0o644)
+        blocked_dir.chmod(0o755)

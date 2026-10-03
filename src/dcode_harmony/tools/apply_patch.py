@@ -128,7 +128,9 @@ def _parse_patch(patch: str) -> list[Operation]:
     return ops
 
 
-def _find_hunk_position(haystack: list[str], needle: list[str], start: int) -> int:
+def _find_hunk_position(
+    haystack: list[str], needle: list[str], start: int, *, require_eof: bool = False
+) -> int:
     if not needle:
         return start
     matches = [
@@ -136,7 +138,11 @@ def _find_hunk_position(haystack: list[str], needle: list[str], start: int) -> i
         for idx in range(start, len(haystack) - len(needle) + 1)
         if haystack[idx : idx + len(needle)] == needle
     ]
+    if require_eof:
+        matches = [idx for idx in matches if idx + len(needle) == len(haystack)]
     if not matches:
+        if require_eof:
+            raise PatchError("Update context not anchored at end of file")
         raise PatchError("Malformed update hunk: context not found")
     if len(matches) > 1:
         raise PatchError("ambiguous context")
@@ -159,32 +165,29 @@ def _apply_update(
     source = original.splitlines()
     out = source[:]
     cursor = 0
-    current_hunk: list[str] = []
-    last_match_end_at_eof = False
 
-    def apply_hunk(hunk: list[str]) -> None:
-        nonlocal out, cursor, last_match_end_at_eof
-        if not hunk:
-            return
+    hunks: list[list[str]] = []
+    current: list[str] = []
+    for line in patch_lines:
+        if line.startswith("@@"):
+            if current:
+                hunks.append(current)
+                current = []
+            continue
+        current.append(line)
+    if current:
+        hunks.append(current)
+
+    for index, hunk in enumerate(hunks):
+        require_eof = end_of_file and index == len(hunks) - 1
         for line in hunk:
             if not line or line[0] not in {" ", "+", "-"}:
                 raise PatchError("Malformed update hunk lines")
         old_chunk = [line[1:] for line in hunk if line[0] in {" ", "-"}]
         new_chunk = [line[1:] for line in hunk if line[0] in {" ", "+"}]
-        at = _find_hunk_position(out, old_chunk, cursor)
-        last_match_end_at_eof = at + len(old_chunk) == len(out)
+        at = _find_hunk_position(out, old_chunk, cursor, require_eof=require_eof)
         out = out[:at] + new_chunk + out[at + len(old_chunk) :]
         cursor = at + len(new_chunk)
-
-    for line in patch_lines:
-        if line.startswith("@@"):
-            apply_hunk(current_hunk)
-            current_hunk = []
-            continue
-        current_hunk.append(line)
-    apply_hunk(current_hunk)
-    if end_of_file and not last_match_end_at_eof:
-        raise PatchError("Update context not anchored at end of file")
     body = newline.join(out)
     if has_trailing:
         body += newline
@@ -205,6 +208,19 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
         raise PatchError(f"Workspace does not exist: {workspace}")
     operations = _parse_patch(patch)
     planned: list[_PlannedOp] = []
+    # Virtual workspace state: path -> bytes (or None when absent), so that
+    # later operations on the same path compose with earlier planned ones.
+    state: dict[Path, bytes | None] = {}
+
+    def _read(path: Path) -> bytes | None:
+        if path in state:
+            return state[path]
+        if path.is_symlink():
+            return None
+        if path.exists() and path.is_file():
+            return path.read_bytes()
+        return None
+
     for op in operations:
         source = _resolve_workspace_path(workspace, op.path)
         _check_path_safety(workspace, source)
@@ -212,29 +228,33 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
         if op.move_to is not None:
             target = _resolve_workspace_path(workspace, op.move_to)
             _check_path_safety(workspace, target)
-            if target.exists() or target.is_symlink():
+            dst_known = _read(target)
+            if dst_known is not None or (target not in state and target.exists()) or target.is_symlink():
                 raise PatchError(f"move destination already exists: {op.move_to}")
         if op.kind == "add":
-            if source.exists() or source.is_symlink():
+            if _read(source) is not None or (source not in state and (source.exists() or source.is_symlink())):
                 raise PatchError(f"Cannot add existing file: {op.path}")
             new_bytes = ("\n".join(op.lines) + ("\n" if op.lines else "")).encode(
                 "utf-8"
             )
             planned.append(_PlannedOp(op, source, target, new_bytes, None))
+            state[source] = new_bytes
             continue
         if op.kind == "delete":
-            if not source.exists() and not source.is_symlink():
+            original = _read(source)
+            if original is None and not source.exists():
                 raise PatchError(f"Cannot delete missing file: {op.path}")
-            if source.is_dir():
+            if source.exists() and source.is_dir():
                 raise PatchError(f"Cannot delete directory: {op.path}")
-            planned.append(_PlannedOp(op, source, target, None, source.read_bytes()))
+            planned.append(_PlannedOp(op, source, target, None, original))
+            state[source] = None
             continue
         if op.kind == "update":
             if not op.lines:
                 raise PatchError("Malformed update operation")
-            if not source.exists() or source.is_symlink():
+            original = _read(source)
+            if original is None:
                 raise PatchError(f"Cannot update missing file: {op.path}")
-            original = source.read_bytes()
             try:
                 text = original.decode("utf-8")
             except UnicodeDecodeError as exc:
@@ -243,6 +263,11 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
             planned.append(
                 _PlannedOp(op, source, target, updated.encode("utf-8"), original)
             )
+            if target != source:
+                state[target] = updated.encode("utf-8")
+                state[source] = None
+            else:
+                state[source] = updated.encode("utf-8")
             continue
         raise PatchError(f"Unsupported operation: {op.kind}")
     return planned
@@ -256,19 +281,29 @@ def _open_parent_fd(path: Path) -> int:
 
 
 def _write_bytes_secure(path: Path, data: bytes) -> None:
+    """Write fully to a temp file in the same directory, then atomically
+    replace the target. A failed write never leaves a truncated target."""
     dir_fd = _open_parent_fd(path)
+    tmp_name = f".{path.name}.dcode-tmp-{os.getpid()}-{os.urandom(4).hex()}"
     try:
-        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW
-        fd = os.open(path.name, flags, 0o644, dir_fd=dir_fd)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        fd = os.open(tmp_name, flags, 0o644, dir_fd=dir_fd)
         try:
             with os.fdopen(fd, "wb") as handle:
                 handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
         except Exception:
             try:
                 os.close(fd)
             except OSError:
                 pass
+            try:
+                os.unlink(tmp_name, dir_fd=dir_fd)
+            except OSError:
+                pass
             raise
+        os.replace(tmp_name, path.name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
     finally:
         os.close(dir_fd)
 
