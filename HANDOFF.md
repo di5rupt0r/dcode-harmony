@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Date: 2026-10-02
+- Date: 2026-10-03
 - Repository: `di5rupt0r/dcode-harmony`
-- Branch / PR: `copilot/continue-implementation` (PR #1)
-- Scope of this PR (fixed): M1 packaging/launcher bootstrap, M2 native Harmony provider, M3 safe `apply_patch`, M4 launcher/model selection (unit-level)
-- Out of scope: M5 live llama-server validation, M6 release/lockfile/versioning (follow-up PRs)
+- Branch / PR: `docs/standardize-rectify` (PR #2)
+- Scope of this PR (fixed): documentation rectification, standardization, and aesthetics only (README, MILESTONES, HANDOFF)
+- Out of scope: any code/behavior change, reasoning_effort (PR #3), latency investigation (PR #4), M6
 
 ## Decisions recorded
 
@@ -101,7 +101,7 @@ Decisions recorded:
 - Streaming is real SSE (`stream: true`); analysis channel content is never
   emitted as visible chunks; tool calls surface as complete chunks on close.
 - Multi-file patches validate before writing and roll back on failure.
-- No dnf packages installed; wei `uv`-managed interpreter was sufficient.
+- No dnf packages installed; the `uv`-managed interpreter was sufficient.
 
 Remaining risks: live validation pending; no CI (default local pytest is the
 gate); lockfile policy (M6) deferred; tool-call partial args not streamed.
@@ -185,7 +185,7 @@ Final validation (this host, this round):
   --help` prints deepagents-code v0.1.80
 - `python -m build` → wheel + sdist
 
-Recommendation: **aprovar após condição X** — as the round required, all
+Recommendation: **approve after condition X** — as the round required, all
 gates pass; the only outstanding item is M6 (CI/lockfile/release policy),
 which must land as a follow-up PR before calling the project fully
 maintainable. No merge was performed.
@@ -221,7 +221,7 @@ Final validation (this host, this round):
 - `ruff check .` → pass; `ruff format --check .` → pass; `ty check src/` → pass
 - clean install + `dcode --help` OK; `python -m build` OK
 
-Recommendation: **aprovar após condição X** — all gates pass and docs are
+Recommendation: **approve after condition X** — all gates pass and docs are
 consistent; M6 (CI/lockfile/release) remains the explicit follow-up. No
 merge performed.
 
@@ -251,7 +251,7 @@ Final validation (this host):
 - `pytest -q` → **94 passed**
 - `ruff check .` / `ruff format --check .` → pass; `ty check src/` → pass
 
-Recommendation: **aprovar após condição X** — M6 (CI/lockfile/release) is
+Recommendation: **approve after condition X** — M6 (CI/lockfile/release) is
 the only remaining follow-up. No merge performed.
 
 ### 2026-10-02 — Review-fix round 4 (virtual modes, chmod cleanup, README count)
@@ -279,7 +279,57 @@ chmod-failure test), `4007c30` (README count, syscall-boundary docs).
 Final validation: `pytest -q` → **96 passed**; ruff check/format pass;
 `ty check src/` pass.
 
-Recommendation: **aprovar após condição X** — M6 follow-up only. No merge.
+Recommendation: **approve after condition X** — M6 follow-up only. No merge.
+
+### 2026-10-03 — PR #2 docs standardization (start)
+
+Intent: rectify contradictions between README/MILESTONES/HANDOFF, standardize
+language and structure, and polish aesthetics. Docs-only PR; the test-first
+rule is N/A at the code level — validation is (a) real `pytest` counts cited,
+(b) all relative links resolve, (c) no code diffs.
+
+Addendum (same PR, user feedback): the README was too polluted and WIP-looking.
+Restructure per user direction:
+
+- Adopt the Diátaxis model (tutorials / how-to guides / reference /
+  explanation) under `docs/`.
+- README becomes a lean entry point: one-paragraph intro, quickstart, status
+  badges-as-list, and links into `docs/`.
+- Add `llms.txt` at root: an index of every doc file with a one-line summary,
+  so AI agents can navigate without scraping.
+- HANDOFF.md / MILESTONES.md / AGENTS.md stay at root (agent-facing protocol
+  docs); user/operational docs move under `docs/`.
+
+Decisions:
+
+1. Documentation language is English across all files (AGENTS.md already is;
+   README's "Escopo da validação"/"Não validado live" sections were PT).
+2. HANDOFF keeps the append-only session/change log; "Current state" stays a
+   short summary pointing at the active PR.
+3. README gains a TOC and tables where lists mixed concerns (validation
+   results, live scope), keeping every existing fact verbatim where true.
+4. Suite-count claims must match the last real run (2026-10-03: 91 passed,
+   6 live-deselected; full run 97 passed).
+
+### 2026-10-03 — PR #2 docs standardization (result)
+
+- README TOC added; Portuguese sections ("Escopo da validação",
+  "Validado live", "Não validado live") translated to English; scope
+  wording de-personalized (no stale "this PR" pointers); PT recommendation
+  lines translated; typo fixed.
+- HANDOFF session log kept append-only; current-state header now points to
+  PR #2. MILESTONES header now states PR #1 merged M1–M5, PR #2/#3/#4 roles.
+- Validation: all relative links in README/docs/llms.txt resolve
+  (scripted check → none broken); `pytest -m "not live" -q` → 91 passed,
+  6 deselected (no code touched). Docs diff vs main remains docs-only.
+- Addendum (2026-10-03, user feedback): README judged too polluted/WIP.
+  Restructured to a lean entry point + Diátaxis `docs/` tree
+  (tutorials/getting-started, how-to install/run-llama-server/
+  configure-profile/run-tests, reference architecture/configuration/
+  dependencies/error-contract/apply-patch, explanation design-decisions/
+  live-validation), `docs/README.md` index, and root `llms.txt` for
+  AI-agent navigation. AGENTS.md now mandates keeping those indexes in
+  sync and a Diátaxis blockquote on every docs page.
 
 ### 2026-10-03 — Rollback coverage narrowed to post-planning failure
 

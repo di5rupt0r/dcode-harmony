@@ -1,0 +1,36 @@
+# dcode-harmony — documentation index for LLM agents
+
+> Purpose: let an AI agent locate the right document without scraping.
+> Every entry is a repo-relative path plus a one-line description.
+
+## Entry points
+
+- README.md — project summary, quickstart, status, doc links.
+- AGENTS.md — mandatory workflow (document → test → implement → granular push).
+- HANDOFF.md — current state, decisions, verified APIs, session log.
+- MILESTONES.md — roadmap M0–M6 with acceptance criteria.
+
+## docs/ (Diátaxis)
+
+Tutorials:
+- docs/tutorials/getting-started.md — clone to working `dcode` in ~10 min.
+
+How-to:
+- docs/how-to/install.md — source/editable install.
+- docs/how-to/run-llama-server.md — validated server command + health check.
+- docs/how-to/configure-profile.md — `DEEPAGENTS_HOME`, bootstrap config.
+- docs/how-to/run-tests.md — unit vs live suites, lint/type gates.
+
+Reference:
+- docs/reference/architecture.md — components and integration order.
+- docs/reference/configuration.md — defaults and overrides.
+- docs/reference/dependencies.md — pinned package versions.
+- docs/reference/error-contract.md — httpx exception contract table.
+- docs/reference/apply-patch.md — grammar and safety guarantees.
+
+Explanation:
+- docs/explanation/design-decisions.md — why the current shape exists.
+- docs/explanation/live-validation.md — what was/wasn't live-tested.
+
+Index:
+- docs/README.md — human-readable map of all of the above.
