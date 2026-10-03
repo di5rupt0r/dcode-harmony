@@ -25,6 +25,8 @@ dcode_harmony = "dcode_harmony.extensions"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4,<9",
+    "ruff>=0.16,<1",
+    "ty>=0.0.84,<0.1",
 ]
 
 [tool.hatch.build.targets.wheel]
