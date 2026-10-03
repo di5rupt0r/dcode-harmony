@@ -2,7 +2,9 @@
 
 Statuses: `DONE`, `IN PROGRESS`, `TODO`, `BLOCKED`.
 
-PR #1 (`copilot/continue-implementation`) is a self-contained unit for **M1–M4 only**.
+PR #1 (`copilot/continue-implementation`) covers **M1–M5**: M1–M4 are
+packaging/provider/patch/launcher hardening; M5 (live validation against
+the real llama-server) completed 2026-10-02. M6 remains a follow-up PR.
 
 ## M0 — Repository bootstrap and handoff documentation — DONE
 
@@ -108,7 +110,8 @@ Acceptance criteria:
 ## Change log
 
 - 2026-10-02: Bootstrap recovery completed; created initial documented base after handoff attempts targeted an empty repository.
-- 2026-10-02: PR #1 scope locked to M1–M4. M5 and M6 deferred to follow-up PRs.
+- 2026-10-02: PR #1 scoped to M1–M4 initially; M5 completed within the
+  same PR after live validation. M6 (CI/lockfile/release) remains TODO.
 
 ## 2026-10-02 review-round status update
 

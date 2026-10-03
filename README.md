@@ -27,13 +27,15 @@ The finished project will be installable independently from the upstream `deepag
 - `apply_patch` registered through `dcode.extensions`;
 - verified clean-environment install (`python -m pip install .`, `dcode --help`, `python -m build`).
 
-Not in this PR: live llama-server validation on this machine (server was not running; CI is not configured yet), lockfile/versioning policy.
+Validated live on 2026-10-02 against the real server (M5 DONE — see
+*Live validation* below). Not in this PR: CI, lockfile/versioning policy
+(M6).
 
 ## Test validation
 
 ```bash
 python -m pytest -q          # full suite (live tests skip without a server)
-python -m pytest -m "not live"  # 55 unit/integration tests, no server needed
+python -m pytest -m "not live"  # unit/integration tests, no server needed
 python -m pytest -m live     # requires llama-server on 127.0.0.1:8080
 ```
 
