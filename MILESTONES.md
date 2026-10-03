@@ -69,7 +69,20 @@ Acceptance criteria (this PR):
 - all operations are validated before any write (failed later op leaves earlier files unchanged);
 - `@@` headers are anchors; ambiguous context without an anchor raises `PatchError("ambiguous context")`;
 - trailing newline and CRLF are preserved;
-- registration is verified through a fake `ExtensionAPI` (`api.cwd` wrapped in `Path`).
+- registration is verified through the real `ExtensionRegistry` +
+  `ExtensionAPI` (`tests/test_extension_registration.py`);
+- repeated operations on the same path compose through a virtual
+  per-path byte+mode state in `_plan` (no stale overwrites);
+- `*** End of File` hunks disambiguate context (EOF-anchored matches win);
+- writes are atomic via temp file + `os.replace`, preserve the original
+  permission bits, and leave no staged `.dcode-tmp-*` files on failure;
+- insertion-only EOF hunks append at end of file;
+- long filenames near the component limit work (short random temp names);
+- non-writable parent directories are rejected at planning with a clear
+  `PatchError`;
+- rollback is verified against a real I/O failure (unwritable subdirectory),
+  restoring source bytes, destination state, and modes, and removing
+  directories created by the patch.
 
 ## M4 — Plug-and-play launcher and model selection — DONE
 
@@ -140,3 +153,8 @@ Acceptance criteria:
   fields). Documented server facts and streaming sentinel absence in
   README/HANDOFF.
 - M6 TODO (unchanged): no CI config, no lockfile policy yet.
+
+- 2026-10-02: apply_patch hardening completed across rounds 3–4 (atomic
+  writes, mode preservation, virtual mode/byte state, EOF-anchor
+  disambiguation, staged-temp cleanup, readonly-dir plan-time rejection);
+  M5 validated live on the real server; M6 remains the only follow-up.
