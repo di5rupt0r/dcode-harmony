@@ -52,11 +52,27 @@ def test_cli_main_sets_env_and_delegates(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_launcher_respects_env_override_for_home(monkeypatch, tmp_path: Path) -> None:
+    """run_dcode must honor DEEPAGENTS_HOME — no write under ~/.dcode-harmony."""
     custom_home = tmp_path / "custom"
     monkeypatch.setenv("DEEPAGENTS_HOME", str(custom_home))
-    profile = ensure_profile(custom_home)
-    assert profile == custom_home
-    assert profile.exists()
+    monkeypatch.setenv("HOME", str(tmp_path / "fakehome"))
+    captured: dict[str, str] = {}
+
+    def _cli_main() -> None:
+        import os
+
+        captured["DEEPAGENTS_HOME"] = os.environ.get("DEEPAGENTS_HOME", "")
+        captured["config_exists"] = str((custom_home / "config.toml").exists())
+
+    monkeypatch.setitem(
+        sys.modules, "deepagents_code", types.SimpleNamespace(cli_main=_cli_main)
+    )
+    monkeypatch.delenv("DEEPAGENTS_CODE_EXPERIMENTAL", raising=False)
+
+    assert cli.main() == 0
+    assert captured["DEEPAGENTS_HOME"] == str(custom_home)
+    assert captured["config_exists"] == "True"
+    assert not (tmp_path / "fakehome" / ".dcode-harmony").exists()
 
 
 def test_bootstrap_config_includes_endpoint_params() -> None:
