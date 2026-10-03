@@ -479,3 +479,62 @@ def test_failed_replace_leaves_no_staged_temp(tmp_path: Path, monkeypatch) -> No
     leftovers = [p.name for p in tmp_path.iterdir() if ".dcode-tmp-" in p.name]
     assert leftovers == []
     assert target.read_text(encoding="utf-8") == "old\n"
+
+
+def test_delete_add_update_same_path_replacement_keeps_default_mode(
+    tmp_path: Path,
+) -> None:
+    import os
+    import stat
+
+    target = tmp_path / "run.sh"
+    target.write_text("old\n", encoding="utf-8")
+    target.chmod(0o755)
+    patch = """*** Begin Patch
+*** Delete File: run.sh
+*** Add File: run.sh
++new
+*** Update File: run.sh
+@@
+-new
++newer
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "newer\n"
+    mode = stat.S_IMODE(os.stat(target).st_mode)
+    assert mode != 0o755, f"replacement inherited deleted file's mode: {oct(mode)}"
+
+
+def test_failed_chmod_leaves_no_staged_temp(tmp_path: Path, monkeypatch) -> None:
+    """Fault injection at the syscall boundary.
+
+    No user-space boundary reproduces "write allowed, chmod denied" on this
+    host (chattr +i is EPERM, no read-only tmpfs available), so this stubs
+    only `os.chmod` — the smallest possible boundary, same class as the
+    httpx transport mock. The target must stay intact and no staged temp
+    may remain.
+    """
+    import dcode_harmony.tools.apply_patch as ap
+
+    target = tmp_path / "a.txt"
+    target.write_text("old\n", encoding="utf-8")
+
+    def _chmod_boom(path, mode, **kwargs):
+        raise OSError("simulated chmod failure")
+
+    target.chmod(0o755)
+    monkeypatch.setattr(ap.os, "chmod", _chmod_boom)
+    patch = """*** Begin Patch
+*** Update File: a.txt
+@@
+-old
++new
+*** End Patch
+"""
+    with pytest.raises(OSError, match="simulated chmod failure"):
+        apply_patch_text(patch, workspace=tmp_path)
+    monkeypatch.undo()
+    leftovers = [p.name for p in tmp_path.iterdir() if ".dcode-tmp-" in p.name]
+    assert leftovers == []
+    assert target.read_text(encoding="utf-8") == "old\n"

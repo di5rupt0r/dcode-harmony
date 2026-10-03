@@ -223,6 +223,7 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
     # Virtual workspace state: path -> bytes (or None when absent), so that
     # later operations on the same path compose with earlier planned ones.
     state: dict[Path, bytes | None] = {}
+    modes: dict[Path, int | None] = {}
 
     def _read(path: Path) -> bytes | None:
         if path in state:
@@ -232,6 +233,11 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
         if path.exists() and path.is_file():
             return path.read_bytes()
         return None
+
+    def _mode_for(path: Path) -> int | None:
+        if path in modes:
+            return modes[path]
+        return _mode_of(path)
 
     for op in operations:
         source = _resolve_workspace_path(workspace, op.path)
@@ -257,6 +263,7 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
             )
             planned.append(_PlannedOp(op, source, target, new_bytes, None))
             state[source] = new_bytes
+            modes[source] = None  # add uses default creation mode
             continue
         if op.kind == "delete":
             original = _read(source)
@@ -265,9 +272,10 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
             if source.exists() and source.is_dir():
                 raise PatchError(f"Cannot delete directory: {op.path}")
             planned.append(
-                _PlannedOp(op, source, target, None, original, _mode_of(source))
+                _PlannedOp(op, source, target, None, original, _mode_for(source))
             )
             state[source] = None
+            modes[source] = None
             continue
         if op.kind == "update":
             if not op.lines:
@@ -287,14 +295,17 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
                     target,
                     updated.encode("utf-8"),
                     original,
-                    _mode_of(source),
+                    _mode_for(source),
                 )
             )
             if target != source:
                 state[target] = updated.encode("utf-8")
+                modes[target] = _mode_for(source)
                 state[source] = None
+                modes[source] = None
             else:
                 state[source] = updated.encode("utf-8")
+                modes[source] = _mode_for(source)
             continue
         raise PatchError(f"Unsupported operation: {op.kind}")
     for item in planned:
@@ -342,9 +353,9 @@ def _write_bytes_secure(path: Path, data: bytes, mode: int | None = None) -> Non
             except OSError:
                 pass
             raise
-        if mode is not None:
-            os.chmod(tmp_name, mode, dir_fd=dir_fd)
         try:
+            if mode is not None:
+                os.chmod(tmp_name, mode, dir_fd=dir_fd)
             os.replace(tmp_name, path.name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
         except Exception:
             try:
