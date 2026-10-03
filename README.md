@@ -56,6 +56,13 @@ server on this machine** — no llama-server was running and the host lacks
 - Writes use `dir_fd` + `O_NOFOLLOW`, so a symlink swapped in mid-operation
   cannot redirect the write. Ambiguous hunk context is rejected
   (`ambiguous context`).
+- TOCTOU scope: parent directories are opened by path (`os.open(parent)`),
+  not walked fd-by-fd. The tool therefore defends against a symlinked final
+  path component and a symlinked parent at validation time, but does **not**
+  provide full resistance to an attacker concurrently swapping an
+  intermediate directory between validation and `open`. Running patches in
+  a private workspace is the expected boundary. Do not rely on this tool as
+  a security boundary against a hostile local process.
 
 
 ## Current user experience
