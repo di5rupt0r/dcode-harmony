@@ -253,3 +253,30 @@ Final validation (this host):
 
 Recommendation: **aprovar após condição X** — M6 (CI/lockfile/release) is
 the only remaining follow-up. No merge performed.
+
+### 2026-10-02 — Review-fix round 4 (virtual modes, chmod cleanup, README count)
+
+Commits: `30e1985` (virtual mode tracking, chmod failure cleanup,
+chmod-failure test), `4007c30` (README count, syscall-boundary docs).
+
+- `_plan` now carries a virtual mode per path (`modes` dict) alongside the
+  byte state; a later update resolves its mode from that state instead of
+  reading the physical file. Delete→Add→Update on the same path now yields
+  the add's default mode, not the deleted file's mode.
+- `os.chmod` and `os.replace` in `_write_bytes_secure` share one
+  cleanup-protected block: any failure unlinks the staged temp.
+- chmod-failure regression test added with an explicit docstring
+  justification for syscall-level fault injection (verified: `chattr +i`
+  is EPERM on this host, no read-only tmpfs available, so no user-space
+  boundary exists for "write ok, chmod denied").
+- The rewrite/move tests for read-only dirs and replace failure are the
+  plan-time guard (PATCH is rejected before any write) and the same
+  documented fault-injection boundary, respectively — AGENTS.md's
+  "no internal mocks" rule targets parsers/filesystem logic, not libc
+  stubs used for fault injection.
+- README suite accounting: 96 total (90 + 6 live).
+
+Final validation: `pytest -q` → **96 passed**; ruff check/format pass;
+`ty check src/` pass.
+
+Recommendation: **aprovar após condição X** — M6 follow-up only. No merge.
