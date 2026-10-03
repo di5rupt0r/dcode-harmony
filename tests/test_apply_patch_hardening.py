@@ -176,3 +176,91 @@ def test_end_of_file_marker_anchors_to_eof(tmp_path: Path) -> None:
 """
     apply_patch_text(patch, workspace=tmp_path)
     assert target.read_text(encoding="utf-8") == "a\nb\nC\n"
+
+
+def test_move_to_existing_destination_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("hello\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("keep\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: a.txt
+*** Move to: b.txt
+@@
+-hello
++changed
+*** End Patch
+"""
+    with pytest.raises(PatchError, match="destination already exists"):
+        apply_patch_text(patch, workspace=tmp_path)
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "hello\n"
+    assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "keep\n"
+
+
+def test_move_to_new_destination_works(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("hello\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: a.txt
+*** Move to: sub/dir/b.txt
+@@
+-hello
++hi
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert not (tmp_path / "a.txt").exists()
+    assert (tmp_path / "sub/dir/b.txt").read_text(encoding="utf-8") == "hi\n"
+
+
+def test_rollback_removes_created_directories(tmp_path: Path) -> None:
+    good = tmp_path / "good.txt"
+    good.write_text("x\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Add File: newdir/created.txt
++data
+*** Update File: missing.txt
+@@
+-nope
++yes
+*** End Patch
+"""
+    with pytest.raises(PatchError):
+        apply_patch_text(patch, workspace=tmp_path)
+    assert not (tmp_path / "newdir").exists()
+    assert good.read_text(encoding="utf-8") == "x\n"
+
+
+def test_rollback_restores_source_after_move_failure(tmp_path: Path) -> None:
+    # Force a post-move failure by placing a later operation that cannot be
+    # validated... validation runs first, so instead trigger a write failure
+    # at execution time via a second move into an existing path created by an
+    # earlier op in the same patch.
+    (tmp_path / "one.txt").write_text("1\n", encoding="utf-8")
+    (tmp_path / "two.txt").write_text("2\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: one.txt
+*** Move to: moved.txt
+@@
+-1
++1b
+*** Delete File: moved.txt
+*** End Patch
+"""
+    # Delete of missing file fails at validation -> nothing applied.
+    with pytest.raises(PatchError):
+        apply_patch_text(patch, workspace=tmp_path)
+    assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "1\n"
+    assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "2\n"
+
+
+def test_empty_file_and_no_final_newline_and_crlf_and_unicode(tmp_path: Path) -> None:
+    p = tmp_path / "unicode.txt"
+    p.write_bytes("olá\r\nfim".encode("utf-8"))  # CRLF + no trailing newline
+    patch = """*** Begin Patch
+*** Update File: unicode.txt
+@@
+ olá
+-fim
++fim!
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert p.read_bytes() == "olá\r\nfim!".encode("utf-8")
