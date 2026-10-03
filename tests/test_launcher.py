@@ -123,7 +123,12 @@ def test_dcode_help_subprocess(tmp_path: Path) -> None:
     env = {**__import__("os").environ, "DEEPAGENTS_HOME": str(tmp_path / "profile")}
     binary = Path(sys.executable).parent / "dcode"
     result = subprocess.run(
-        [str(binary), "--help"], env=env, capture_output=True, text=True, timeout=180, check=False
+        [str(binary), "--help"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=180,
+        check=False,
     )
     assert result.returncode == 0
     assert "deepagents-code" in result.stdout

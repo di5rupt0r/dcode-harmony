@@ -75,7 +75,7 @@ def test_payload_uses_native_harmony_tokens() -> None:
 
 def test_parse_harmony_completion_maps_tool_call() -> None:
     tokens = _ENC.encode(
-        'to=functions.apply_patch<|channel|>commentary json<|message|>'
+        "to=functions.apply_patch<|channel|>commentary json<|message|>"
         '{"patch": "*** Begin Patch\\n*** End Patch\\n"}<|call|>'
         "<|start|>assistant<|channel|>final<|message|>done<|return|>",
         allowed_special="all",
@@ -259,7 +259,7 @@ def test_parse_truncated_tokens_return_sane_ai_message() -> None:
 
 def test_parse_tool_call_with_whitespace_padded_json() -> None:
     tokens = _ENC.encode(
-        'to=functions.apply_patch<|channel|>commentary json<|message|>'
+        "to=functions.apply_patch<|channel|>commentary json<|message|>"
         '  { "patch": "x" }  <|call|>',
         allowed_special="all",
     )
@@ -269,7 +269,7 @@ def test_parse_tool_call_with_whitespace_padded_json() -> None:
 
 def test_parse_tool_call_with_newline_in_json_args() -> None:
     tokens = _ENC.encode(
-        'to=functions.apply_patch<|channel|>commentary json<|message|>'
+        "to=functions.apply_patch<|channel|>commentary json<|message|>"
         '{"patch": "line1\\nline2"}<|call|>',
         allowed_special="all",
     )
@@ -279,7 +279,7 @@ def test_parse_tool_call_with_newline_in_json_args() -> None:
 
 def test_parse_unknown_recipient_tool_is_not_registered_error() -> None:
     tokens = _ENC.encode(
-        'to=functions.nonexistent_tool<|channel|>commentary json<|message|>'
+        "to=functions.nonexistent_tool<|channel|>commentary json<|message|>"
         '{"x": 1}<|call|>',
         allowed_special="all",
     )
