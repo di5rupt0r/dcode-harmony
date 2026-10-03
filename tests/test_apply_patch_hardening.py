@@ -262,3 +262,90 @@ def test_empty_file_and_no_final_newline_and_crlf_and_unicode(tmp_path: Path) ->
 """
     apply_patch_text(patch, workspace=tmp_path)
     assert p.read_bytes() == "olá\r\nfim!".encode()
+
+
+def test_same_path_multiple_operations_compose(tmp_path: Path) -> None:
+    target = tmp_path / "a.txt"
+    target.write_text("old\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: a.txt
+@@
+-old
++first
+*** Update File: a.txt
+@@
+-first
++second
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "second\n"
+
+
+def test_add_then_update_same_path_composes(tmp_path: Path) -> None:
+    patch = """*** Begin Patch
+*** Add File: new.txt
++alpha
+*** Update File: new.txt
+@@
+-alpha
++beta
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "beta\n"
+
+
+def test_delete_then_add_same_path_composes(tmp_path: Path) -> None:
+    (tmp_path / "d.txt").write_text("gone\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Delete File: d.txt
+*** Add File: d.txt
++back
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert (tmp_path / "d.txt").read_text(encoding="utf-8") == "back\n"
+
+
+def test_eof_anchored_hunk_ignores_earlier_duplicates(tmp_path: Path) -> None:
+    target = tmp_path / "tail.txt"
+    target.write_text("a\nx\nb\nx\n", encoding="utf-8")
+    patch = """*** Begin Patch
+*** Update File: tail.txt
+@@
+-x
++X
+*** End of File
+*** End Patch
+"""
+    apply_patch_text(patch, workspace=tmp_path)
+    assert target.read_text(encoding="utf-8") == "a\nx\nb\nX\n"
+
+
+def test_failed_write_leaves_original_file_intact(tmp_path: Path) -> None:
+    good = tmp_path / "good.txt"
+    good.write_text("one\nold\n", encoding="utf-8")
+    blocked = tmp_path / "blocked.txt"
+    blocked.write_text("keep\n", encoding="utf-8")
+    blocked.chmod(0o444)
+    try:
+        patch = """*** Begin Patch
+*** Update File: good.txt
+@@
+ one
+-old
++new
+*** Update File: blocked.txt
+@@
+-keep
++changed
+*** End Patch
+"""
+        with pytest.raises((PatchError, OSError)):
+            apply_patch_text(patch, workspace=tmp_path)
+        # Rollback must restore the earlier successful edit too.
+        assert good.read_text(encoding="utf-8") == "one\nold\n"
+        assert blocked.read_text(encoding="utf-8") == "keep\n"
+    finally:
+        blocked.chmod(0o644)
