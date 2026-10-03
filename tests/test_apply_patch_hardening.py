@@ -465,6 +465,9 @@ def test_failed_replace_leaves_no_staged_temp(tmp_path: Path, monkeypatch) -> No
     def _boom(src, dst, **kwargs):
         raise OSError("simulated rename failure")
 
+    # Syscall-boundary fault injection: no user-space trigger exists for
+    # EPERM-on-rename on this host (chattr +i not permitted; no ro-tmpfs).
+    # Stubbed only `os.replace` — same class as the httpx transport mock.
     monkeypatch.setattr(ap.os, "replace", _boom)
     patch = """*** Begin Patch
 *** Update File: a.txt
