@@ -15,10 +15,10 @@ _ENCODING = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
 
 
 def _sse(lines: list[dict]) -> bytes:
-    return (
-        b"".join(b"data: " + json.dumps(line).encode() + b"\n\n" for line in lines)
-        + b"data: [DONE]\n\n"
-    )
+    """Reproduce the real llama-server /completion stream shape: events with
+    content/tokens/stop, a final stop:true event, then connection close.
+    No [DONE] sentinel (llama-server does not send one)."""
+    return b"".join(b"data: " + json.dumps(line).encode() + b"\n\n" for line in lines)
 
 
 def _model(handler) -> HarmonyCompletionChatModel:
@@ -200,3 +200,21 @@ def test_text_without_tokens_does_not_leak_harmony_markup() -> None:
     )
     with pytest.raises(ValueError, match="Harmony markup"):
         list(model.stream([HumanMessage("hi")]))
+
+
+def test_done_sentinel_tolerated_for_compatibility() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b'data: {"content": "hello", "stop": true}\n\ndata: [DONE]\n\n',
+        )
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b",
+        base_url="http://127.0.0.1:8080",
+        transport=httpx.MockTransport(handler),
+    )
+    chunks = list(model.stream([HumanMessage("hi")]))
+    text = "".join(c.content for c in chunks if isinstance(c.content, str))
+    assert text == "hello"

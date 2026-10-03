@@ -141,7 +141,7 @@ def test_stream_yields_chunks_from_completion() -> None:
         return httpx.Response(
             200,
             headers={"content-type": "text/event-stream"},
-            content=b'data: {"content": "hello", "stop": true}\n\ndata: [DONE]\n\n',
+            content=b'data: {"content": "hello", "stop": true}\n\n',
         )
 
     transport = httpx.MockTransport(_handler)
