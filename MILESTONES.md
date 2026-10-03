@@ -2,9 +2,9 @@
 
 Statuses: `DONE`, `IN PROGRESS`, `TODO`, `BLOCKED`.
 
-PR #1 (`copilot/continue-implementation`) covers **M1–M5**: M1–M4 are
-packaging/provider/patch/launcher hardening; M5 (live validation against
-the real llama-server) completed 2026-10-02. M6 remains a follow-up PR.
+PR #1 (`copilot/continue-implementation`, merged 2026-10-02) covered **M1–M5**.
+M6 remains a follow-up PR. PR #2 tracks docs-only rectification/standardization;
+PR #3 tracks reasoning_effort; PR #4 tracks latency investigation.
 
 ## M0 — Repository bootstrap and handoff documentation — DONE
 

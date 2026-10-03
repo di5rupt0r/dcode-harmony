@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Date: 2026-10-02
+- Date: 2026-10-03
 - Repository: `di5rupt0r/dcode-harmony`
-- Branch / PR: `copilot/continue-implementation` (PR #1)
-- Scope of this PR (fixed): M1 packaging/launcher bootstrap, M2 native Harmony provider, M3 safe `apply_patch`, M4 launcher/model selection (unit-level)
-- Out of scope: M5 live llama-server validation, M6 release/lockfile/versioning (follow-up PRs)
+- Branch / PR: `docs/standardize-rectify` (PR #2)
+- Scope of this PR (fixed): documentation rectification, standardization, and aesthetics only (README, MILESTONES, HANDOFF)
+- Out of scope: any code/behavior change, reasoning_effort (PR #3), latency investigation (PR #4), M6
 
 ## Decisions recorded
 
@@ -280,6 +280,24 @@ Final validation: `pytest -q` → **96 passed**; ruff check/format pass;
 `ty check src/` pass.
 
 Recommendation: **aprovar após condição X** — M6 follow-up only. No merge.
+
+### 2026-10-03 — PR #2 docs standardization (start)
+
+Intent: rectify contradictions between README/MILESTONES/HANDOFF, standardize
+language and structure, and polish aesthetics. Docs-only PR; the test-first
+rule is N/A at the code level — validation is (a) real `pytest` counts cited,
+(b) all relative links resolve, (c) no code diffs.
+
+Decisions:
+
+1. Documentation language is English across all files (AGENTS.md already is;
+   README's "Escopo da validação"/"Não validado live" sections were PT).
+2. HANDOFF keeps the append-only session/change log; "Current state" stays a
+   short summary pointing at the active PR.
+3. README gains a TOC and tables where lists mixed concerns (validation
+   results, live scope), keeping every existing fact verbatim where true.
+4. Suite-count claims must match the last real run (2026-10-03: 91 passed,
+   6 live-deselected; full run 97 passed).
 
 ### 2026-10-03 — Rollback coverage narrowed to post-planning failure
 
