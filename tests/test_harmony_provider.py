@@ -403,3 +403,72 @@ def test_bind_tools_tool_choice_unsupported_rejected() -> None:
     model = HarmonyCompletionChatModel(model="gpt-oss-20b")
     with pytest.raises(ValueError, match="tool_choice"):
         model.bind_tools([apply_patch], tool_choice="required")
+
+
+def test_connection_refused_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(httpx.ConnectError):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_http_400_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "bad request"})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_tokens_wrong_type_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"content": "ok", "tokens": "nope"})
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(ValueError, match="tokens"):
+        model.invoke([HumanMessage("hi")])
+
+
+def test_malformed_sse_event_raises() -> None:
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b"data: {not json}\n\n",
+        )
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    with pytest.raises(ValueError, match="Malformed streaming event"):
+        list(model.stream([HumanMessage("hi")]))
+
+
+def test_truncated_sse_without_stop_still_yields_seen_tokens() -> None:
+    from openai_harmony import HarmonyEncodingName, load_harmony_encoding
+
+    enc = load_harmony_encoding(HarmonyEncodingName.HARMONY_GPT_OSS)
+    tokens = enc.encode("<|channel|>final<|message|>partial answer", allowed_special="all")
+
+    def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b"data: " + json.dumps({"content": "", "tokens": tokens}).encode() + b"\n\n",
+        )
+
+    model = HarmonyCompletionChatModel(
+        model="gpt-oss-20b", transport=httpx.MockTransport(_handler)
+    )
+    chunks = list(model.stream([HumanMessage("hi")]))
+    text = "".join(c.content for c in chunks if isinstance(c.content, str))
+    assert "partial answer" in text
