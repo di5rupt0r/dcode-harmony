@@ -548,7 +548,9 @@ def test_rollback_after_post_planning_failure(tmp_path: Path, monkeypatch) -> No
 
     `_plan` passes (real dirs are writable), so this isolates the rollback
     path. The failure is injected at the syscall boundary (`os.replace`) —
-    no user-space trigger reaches mid-execution (see other tests).
+    permitted exception per AGENTS.md: no user-space trigger reaches
+    mid-execution on this host (chattr +i → EPERM, no ro-tmpfs, EXDEV
+    unreachable within one directory).
     """
     import os
     import stat

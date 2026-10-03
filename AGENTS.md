@@ -14,6 +14,7 @@ For every fix or feature, do the work in this order only:
 2. **Tests second**
    - Write a **failing** test for every fix or feature before implementation.
    - Prefer real boundaries (filesystem, Harmony encoding). Mock only external I/O such as HTTP transport.
+   - Exception: syscall-level fault injection (stubbing only `os.replace`/`os.chmod`/`httpx` leaf calls) is permitted for filesystem failure paths that have no available user-space trigger (verified on this host: `chattr +i` → EPERM, no read-only tmpfs, EXDEV unreachable within one directory). The stubbed test must live next to a real-boundary alternative and must assert cleanup invariants (no staged temps, original content/mode restored).
    - Run the new test and confirm it fails for the right reason.
 
 3. **Implement third**
