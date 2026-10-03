@@ -4,9 +4,22 @@
 
 - Date: 2026-10-03
 - Repository: `di5rupt0r/dcode-harmony`
-- Branch / PR: `docs/standardize-rectify` (PR #2)
-- Scope of this PR (fixed): documentation rectification, standardization, and aesthetics only (README, MILESTONES, HANDOFF)
-- Out of scope: any code/behavior change, reasoning_effort (PR #3), latency investigation (PR #4), M6
+- Branch / PR: `test/robustness-suite-phase1` → **PR #6 = phase 1a (trace harness only)**
+- Scope of this PR (fixed): test-side execution-trace harness. No production (`src/`) changes.
+- Out of scope: edge-case tests (PR #6b, `test/edge-case-suite`), live/stress suites, reasoning_effort (PR #3), latency investigation (PR #4), apply_patch limitations (PR #7), M6 (PR #5)
+
+### Open PR map (2026-10-03)
+
+| PR | Branch | Scope |
+|---|---|---|
+| #3 | `feat/reasoning-effort` | `reasoning_effort` support (after #4) |
+| #4 | `investigate/high-latency` | latency investigation; consumes the #6 trace harness |
+| #5 | `chore/m6-release-maintenance` | M6 release/maintenance (last) |
+| #6 | `test/robustness-suite-phase1` | **6a**: trace harness (this PR) |
+| #6b | `test/edge-case-suite` | **6b**: deterministic edge-case tests |
+| #7 | `feat/apply-patch-tolerance` | apply_patch limitations, 3 phases |
+
+Execution order decided 2026-10-03: **6a → #4 → (#3 ∥ #7 fase 1) → 6b → #5**.
 
 ## Decisions recorded
 
@@ -37,6 +50,58 @@ Before changing code: read this file, `README.md`, and `MILESTONES.md`; write fa
 After changing code: run `pytest -m "not live"`; update milestone status with real counts; do not claim live llama-server validation unless a live server was used.
 
 ## Session/change log
+
+### 2026-10-03 — PR #6 split into 6a (trace harness) and 6b (edge cases)
+
+Decision (operator): the original PR #6 mixed instrumentation with edge-case
+tests. Split so the latency investigation (#4) can start as soon as tracing
+exists, without waiting for the full test matrix.
+
+- **PR #6 = 6a** (this branch, `test/robustness-suite-phase1`): trace harness
+  only. Test-side only — `HarmonyCompletionChatModel.transport` accepts any
+  `httpx.BaseTransport`, so a `TracingTransport` wrapper records every request
+  without touching `src/`. Zero production diff is an explicit acceptance
+  criterion.
+- **PR #6b** (branch `test/edge-case-suite`): the deterministic edge-case
+  matrix, consuming the trace format from 6a for failure artifacts.
+- Verified API: `HarmonyCompletionChatModel.transport: httpx.BaseTransport |
+  None` (pydantic field), `timeout_s: float = 120.0`, `max_tokens: int =
+  2048`, `stop: list[str] = ["<|return|>", "<|call|>"]`.
+- New milestone **M7 (TODO)** recorded in `MILESTONES.md` for the robustness
+  suite; M7 is not part of M6.
+- Not claimed: nothing has been implemented yet on this branch; only the
+  decision record.
+
+### 2026-10-03 — PR #6a trace harness implementation
+
+Implemented the execution-trace harness for provider runs. Test-side only —
+zero `src/` changes.
+
+**Files created:**
+- `tests/_trace.py` — `TracingTransport(httpx.BaseTransport)` wrapper that
+  records request/response pairs and per-SSE-event timing for streaming
+  responses. Also provides `trace_event()` for test-side annotations and
+  `get_trace_dir()` for the trace directory.
+- `tests/conftest.py` — pytest plugin: `--trace-dir` CLI option,
+  `DCODE_TRACE_DIR` env var, `tracing_transport` fixture, and
+  `pytest_runtest_makereport` hook that writes per-test JSONL trace files and
+  prints the path on failure.
+- `tests/test_trace_harness.py` — 18 unit tests for the harness itself (record
+  schema, streaming SSE recording, error capture, zero-overhead default).
+- `docs/how-to/debug-agent-runs.md` — how-to guide for reading traces.
+
+**Files modified:**
+- `tests/test_live_llama_server.py` — live tests that create
+  `HarmonyCompletionChatModel` now accept the `tracing_transport` fixture.
+- `docs/README.md` — added link to new how-to guide.
+- `llms.txt` — added entry for new how-to guide.
+
+**Validation:**
+- `pytest -m "not live" -q` → **109 passed, 6 deselected** (91 original + 18
+  new trace harness tests).
+- Zero-overhead verified: no trace files written when `DCODE_TRACE_DIR` is
+  unset.
+- No live validation claimed (no llama-server on this host).
 
 ### 2026-10-02 — PR #1 (M1–M4)
 

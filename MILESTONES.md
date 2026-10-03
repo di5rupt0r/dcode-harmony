@@ -122,6 +122,22 @@ Acceptance criteria:
 - final README and handoff documentation;
 - PR/release notes describing live validation.
 
+## M7 — Agent robustness suite — TODO
+
+Tracked in PR #6 (phase 1a, trace harness) and PR #6b (phase 1b,
+deterministic edge cases); live/stress coverage is a follow-up PR.
+
+Acceptance criteria:
+
+- execution traces (JSONL) for every provider request, with
+  time-to-first-token, tokens/s, stop reason, and error class;
+- a failing test names its trace file automatically;
+- deterministic edge cases covered: truncated SSE, empty `content`/`tokens`,
+  malformed tool args, repeated tool failures, conversation growth, `stop`
+  variants, server restart mid-session;
+- live coverage of multi-tool cycles and long-running sessions (separate PR);
+- no regression in the existing 91 unit + 6 live baseline.
+
 ## Change log
 
 - 2026-10-02: Bootstrap recovery completed; created initial documented base after handoff attempts targeted an empty repository.

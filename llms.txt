@@ -20,6 +20,7 @@ How-to:
 - docs/how-to/run-llama-server.md — validated server command + health check.
 - docs/how-to/configure-profile.md — `DEEPAGENTS_HOME`, bootstrap config.
 - docs/how-to/run-tests.md — unit vs live suites, lint/type gates.
+- docs/how-to/debug-agent-runs.md — execution-trace harness for provider runs.
 
 Reference:
 - docs/reference/architecture.md — components and integration order.

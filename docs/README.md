@@ -17,6 +17,7 @@ Organized per [Diátaxis](https://diataxis.fr/): every page is exactly one of
 - [Run llama-server](how-to/run-llama-server.md)
 - [Configure the dcode profile](how-to/configure-profile.md)
 - [Run the tests](how-to/run-tests.md)
+- [Debug agent runs](how-to/debug-agent-runs.md)
 
 ## Reference
 
