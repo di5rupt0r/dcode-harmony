@@ -47,7 +47,7 @@ Acceptance criteria (this PR):
 - native tool calls become LangChain `AIMessage.tool_calls` with unique ids; malformed tool args raise `ValueError`;
 - `_stream` reads llama-server SSE (`stream: true`) and yields multiple `AIMessageChunk`s via `StreamableParser`;
 - `_generate` stays non-streaming;
-- connection/timeout/HTTP errors wrap into one exception that names the `/completion` endpoint;
+- connection/timeout/HTTP errors propagate as httpx exceptions (ConnectError, TimeoutException, HTTPStatusError); this is the documented contract — no unified wrapper;
 - default endpoint is `http://127.0.0.1:8080/completion`;
 - stop strings match `stop_tokens_for_assistant_actions()` (`<|return|>`, `<|call|>`).
 

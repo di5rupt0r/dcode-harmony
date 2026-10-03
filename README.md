@@ -203,6 +203,20 @@ pytest -m live -q       # needs the server on 127.0.0.1:8080
 
 Every agent must update both `HANDOFF.md` and `MILESTONES.md` before handing work to another agent.
 
+## Error contract
+
+The provider propagates `httpx` exceptions directly — no wrapper type:
+
+- timeout → `httpx.TimeoutException`;
+- connection refused → `httpx.ConnectError`;
+- HTTP 4xx/5xx → `httpx.HTTPStatusError` (from `response.raise_for_status()`);
+- invalid JSON payload → `json.JSONDecodeError` (a `ValueError`);
+- missing/ mistyped `content`/`tokens` → `ValueError`;
+- malformed SSE event → `ValueError`.
+
+Callers that need retry/backoff should catch `httpx.HTTPError` (base class)
+or the specific subclasses above.
+
 ## Differences from upstream dcode
 
 - Ships a `local-harmony:gpt-oss-20b` provider class instead of requiring a
