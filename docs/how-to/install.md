@@ -19,14 +19,15 @@ Verify:
 
 ```bash
 dcode --help
+python -m pytest -m "not live" -q
 ```
 
-To run the test suite you also need the dev extra (contains pytest, ruff,
-`ty`):
+The `.[dev]` extra provides `pytest` only. To run lint/type checks, install
+them separately:
 
 ```bash
-python -m pip install -e ".[dev]"
-python -m pytest -m "not live" -q
+python -m pip install ruff ty
+ruff check . && ruff format --check . && ty check src/
 ```
 
 The published dependency pins (`deepagents-code`, `deepagents`,

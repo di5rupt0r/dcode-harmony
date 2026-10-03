@@ -15,8 +15,9 @@ Live tests exercise `/health`, `/completion` token contract, provider
 `invoke`, streaming, SSE field/terminal shape, and a real `apply_patch`
 tool call applied to a temporary workspace.
 
-Lint/types gate:
+Lint/types gate (requires `ruff` and `ty`, not in `.[dev]`):
 
 ```bash
+python -m pip install ruff ty
 ruff check . && ruff format --check . && ty check src/
 ```
