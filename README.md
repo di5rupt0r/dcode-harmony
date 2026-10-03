@@ -8,7 +8,11 @@ Harmony/raw-completion protocol.
 
 ```bash
 python -m pip install .
+
+# terminal 1 — stays in the foreground; wait for {"status":"ok"}
 llama-server -hfr unsloth/gpt-oss-20b-GGUF -cmoe -fa on -ctk q8_0 -ctv q4_0 -t 4
+
+# terminal 2
 dcode
 ```
 
@@ -26,7 +30,7 @@ Suites: `pytest -q` → 97 passed (91 unit + 6 live, 2026-10-03). See
 
 Open follow-ups:
 
-- PR #2 — documentation overhaul (this branch);
+- PR #2 — documentation overhaul;
 - PR #3 — `reasoning_effort` support;
 - PR #4 — latency investigation.
 

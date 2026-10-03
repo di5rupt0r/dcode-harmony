@@ -50,6 +50,6 @@ pytest -m live -q
 
 ## Next steps
 
-- [Run llama-server as a systemd service](../how-to/run-llama-server.md)
+- [Run llama-server as a systemd service](../how-to/run-llama-server.md#run-as-a-systemd-service)
 - [Configure the dcode profile](../how-to/configure-profile.md)
 - [Architecture reference](../reference/architecture.md)

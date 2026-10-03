@@ -20,5 +20,7 @@ Also:
 - Match existing Python style: 4-space indent, double quotes, `from __future__ import annotations`.
 - Before using third-party APIs, inspect the installed package or upstream docs. Do not guess API names.
 - Mock only external boundaries (e.g. HTTP); do not mock internal behavior or real filesystem patching. Exception: documented syscall-level fault injection (`os.replace`/`os.chmod` leaf stubs) for failure paths with no user-space trigger — see AGENTS.md; assert cleanup invariants.
+- User/operational docs live under `docs/` (index: `docs/README.md`, machine-readable: `llms.txt`).
+- After adding/moving/removing docs: keep `docs/README.md`, `llms.txt`, and MILESTONES/HANDOFF references in sync; every docs page must declare its Diátaxis type in a blockquote at the top.
 
 Canonical detail lives in `AGENTS.md`. Keep this rule file aligned with it.

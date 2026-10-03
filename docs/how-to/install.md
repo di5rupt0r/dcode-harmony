@@ -19,6 +19,13 @@ Verify:
 
 ```bash
 dcode --help
+```
+
+To run the test suite you also need the dev extra (contains pytest, ruff,
+`ty`):
+
+```bash
+python -m pip install -e ".[dev]"
 python -m pytest -m "not live" -q
 ```
 

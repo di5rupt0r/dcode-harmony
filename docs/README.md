@@ -1,5 +1,7 @@
 # Documentation index
 
+> Reference. Index of the `docs/` tree.
+
 Organized per [Diátaxis](https://diataxis.fr/): every page is exactly one of
 **tutorial** (learning), **how-to** (doing a task), **reference** (facts), or
 **explanation** (understanding).
