@@ -79,7 +79,7 @@ Acceptance criteria (this PR, unit-level):
 - existing `config.toml` is not overwritten;
 - `cli_main()` returning `None` maps to exit code 0.
 
-## M5 — Live llama-server validation — TODO
+## M5 — Live llama-server validation — DONE
 
 Tracked in a follow-up PR (do not implement on PR #1).
 
@@ -130,7 +130,9 @@ Acceptance criteria:
   `deepagents_code.config.create_model` (subprocess test); no overwrite of
   existing config; `cli_main() -> None` maps to exit 0; `dcode --help`
   subprocess smoke test passes.
-- M5 TODO (unchanged): no llama-server running on this host; all live tests
-  skip. Live tests expanded to cover `/health`, `/completion`, provider
-  invoke, streaming, and tool-call shape for when a server is available.
+- M5 DONE (2026-10-02): live suite ran against the real
+  `unsloth/gpt-oss-20b-GGUF` llama-server — 6 passed (health, token
+  contract, invoke, streaming, real apply_patch tool call execution, SSE
+  fields). Documented server facts and streaming sentinel absence in
+  README/HANDOFF.
 - M6 TODO (unchanged): no CI config, no lockfile policy yet.

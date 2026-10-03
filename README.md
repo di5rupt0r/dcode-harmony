@@ -134,10 +134,41 @@ Tests precede implementation. This is a project rule, not a suggestion:
 
 Internal filesystem, formatting, parsing, and safety logic must use real tests. Mocking is allowed only at external dependency boundaries, such as HTTP transport to a separately running llama-server. No mock may replace the real patch application or Harmony parser behavior.
 
-Live tests are marked `@pytest.mark.live` and are not part of PR #1 acceptance. Run unit tests with:
+Live tests are marked `@pytest.mark.live`. Run unit tests with:
 
 ```bash
 pytest -m "not live"
+```
+
+## Live validation (2026-10-02, real server)
+
+Validated against a real local server:
+
+- Model: `unsloth/gpt-oss-20b-GGUF` (gpt-oss-20b, `-hfr unsloth/gpt-oss-20b-GGUF -cmoe -fa on -ctk q8_0 -ctv q4_0 -t 4`)
+- Endpoint: `http://127.0.0.1:8080/completion`
+- `/health` returns `{"status":"ok"}` once the model is loaded (returns
+  `503 Loading model` during startup).
+- `/completion` accepts `prompt` as a token id list and returns both
+  `content` and `tokens` when `return_tokens=true`.
+- SSE streaming (`stream: true`) events carry `index`, `content`, `tokens`,
+  `stop`, `id_slot`, `tokens_predicted`, `tokens_evaluated`. llama-server
+  terminates the stream with a `stop: true` event and close — there is **no
+  `data: [DONE]` sentinel**.
+- Provider-level probes against the real model:
+  - `invoke()` on "Reply with exactly: ok" returned `AIMessage(content="ok")`;
+  - `stream()` produced 8 chunks, joined `"1, 2, 3"`, no raw Harmony markup;
+  - a bound `apply_patch` call produced
+    `tool_calls[0] == {"name": "apply_patch", "args": {"patch": "*** Begin
+    Patch\n*** Add File: hello.txt\n+hi\n*** End Patch"}}` and the patch was
+    applied to disk by the real tool.
+- Live suite result: `6 passed` (health, token contract, invoke, stream,
+  tool-call execution, SSE fields). Full suite: `78 passed` (unit + live).
+  `ruff check` and `ruff format --check` pass; `ty check src/` passes.
+
+Repeat with:
+
+```bash
+pytest -m live -q       # needs the server on 127.0.0.1:8080
 ```
 
 ## Documentation and handoff
