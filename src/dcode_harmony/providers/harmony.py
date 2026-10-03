@@ -138,21 +138,12 @@ def parse_harmony_completion(
         except Exception as exc:
             raise ValueError(f"Failed to parse completion tokens: {exc}") from exc
     else:
+        # No tokens: the real /completion contract gives plain text only.
+        # Do not attempt to unpack invented JSON envelopes — any JSON-looking
+        # text is normal assistant content.
         if not payload:
             return AIMessage(content="")
-        # Fallback: try JSON parsing, otherwise treat as plain text
-        try:
-            data = json.loads(payload)
-            if isinstance(data, dict):
-                data = [data]
-            if not isinstance(data, list):
-                raise ValueError("Malformed Harmony response: expected JSON list/dict")
-            messages = [
-                Message.from_dict(entry) for entry in data if isinstance(entry, dict)
-            ]
-        except json.JSONDecodeError:
-            # Not JSON, treat as plain text final message
-            return AIMessage(content=payload, tool_calls=[])
+        return AIMessage(content=payload, tool_calls=[])
 
     final_chunks: list[str] = []
     commentary_chunks: list[str] = []
