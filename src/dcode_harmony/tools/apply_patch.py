@@ -229,10 +229,16 @@ def _plan(patch: str, workspace: Path) -> list[_PlannedOp]:
             target = _resolve_workspace_path(workspace, op.move_to)
             _check_path_safety(workspace, target)
             dst_known = _read(target)
-            if dst_known is not None or (target not in state and target.exists()) or target.is_symlink():
+            if (
+                dst_known is not None
+                or (target not in state and target.exists())
+                or target.is_symlink()
+            ):
                 raise PatchError(f"move destination already exists: {op.move_to}")
         if op.kind == "add":
-            if _read(source) is not None or (source not in state and (source.exists() or source.is_symlink())):
+            if _read(source) is not None or (
+                source not in state and (source.exists() or source.is_symlink())
+            ):
                 raise PatchError(f"Cannot add existing file: {op.path}")
             new_bytes = ("\n".join(op.lines) + ("\n" if op.lines else "")).encode(
                 "utf-8"
